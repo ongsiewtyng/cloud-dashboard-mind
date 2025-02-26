@@ -1,6 +1,6 @@
 import {create} from 'zustand'
 import {db} from "@/lib/firebase";
-import {ref, push, remove, update} from "firebase/database";
+import {ref, push, remove, update, get} from "firebase/database";
 
 export interface Machine {
     id: string
@@ -17,27 +17,11 @@ interface MachineStore {
     deleteMachine: (id: string) => void
     updateMachineStats: () => void
     renameMachine: (id: string, newName: string) => void
+    fetchMachines: () => void
 }
 
 export const useMachineStore = create<MachineStore>((set) => ({
-    machines: [
-        {
-            id: '1',
-            name: 'Production Server 1',
-            status: 'online',
-            cpuUsage: 45,
-            memoryUsage: 62,
-            uptimeHours: 124,
-        },
-        {
-            id: '2',
-            name: 'Development Server',
-            status: 'online',
-            cpuUsage: 28,
-            memoryUsage: 45,
-            uptimeHours: 72,
-        },
-    ],
+    machines: [],
     addMachine: (machine) => {
         const newMachineRef = push(ref(db, "machines"));
         console.log(newMachineRef.key);
@@ -118,4 +102,20 @@ export const useMachineStore = create<MachineStore>((set) => ({
             return {machines: updatedMachines};
         });
     },
-}))
+    fetchMachines: () => {
+        get(ref(db, "machines")).then((snapshot) => {
+            if (snapshot.exists()) {
+                const machinesData = snapshot.val();
+                const machines = Object.keys(machinesData).map((key) => ({
+                    id: key,
+                    ...machinesData[key],
+                }));
+                set({ machines });
+            } else {
+                console.log("No data available");
+            }
+        }).catch((error) => {
+            console.error("Error fetching machines:", error);
+        });
+    },
+}));
