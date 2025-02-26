@@ -59,11 +59,27 @@ export const useMachineStore = create<MachineStore>((set) => ({
     })),
   updateMachineStats: () =>
     set((state) => ({
-      machines: state.machines.map((machine) => ({
-        ...machine,
-        cpuUsage: Math.min(100, Math.max(0, machine.cpuUsage + (Math.random() - 0.5) * 10)),
-        memoryUsage: Math.min(100, Math.max(0, machine.memoryUsage + (Math.random() - 0.5) * 5)),
-        status: Math.random() > 0.95 ? (machine.status === 'online' ? 'offline' : 'online') : machine.status,
-      })),
+      machines: state.machines.map((machine) => {
+        // First, potentially change the status
+        const newStatus = Math.random() > 0.95 
+          ? (machine.status === 'online' ? 'offline' : 'online') 
+          : machine.status;
+
+        // Only update stats if the machine is online
+        if (newStatus === 'online') {
+          return {
+            ...machine,
+            status: newStatus,
+            cpuUsage: Math.min(100, Math.max(0, machine.cpuUsage + (Math.random() - 0.5) * 10)),
+            memoryUsage: Math.min(100, Math.max(0, machine.memoryUsage + (Math.random() - 0.5) * 5)),
+          }
+        }
+
+        // If machine is offline or in maintenance, just update the status
+        return {
+          ...machine,
+          status: newStatus,
+        }
+      }),
     })),
 }))
