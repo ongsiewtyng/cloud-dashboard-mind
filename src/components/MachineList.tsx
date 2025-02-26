@@ -34,20 +34,22 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
           key={machine.id}
           className="widget group relative overflow-hidden"
         >
-          <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100 flex gap-2">
-            <button
-              onClick={() => handleEdit(machine)}
-              className="rounded-full p-2 text-blue-500 hover:bg-blue-50"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => onDelete(machine.id)}
-              className="rounded-full p-2 text-red-500 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
+          {editingId !== machine.id && (
+            <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100 flex gap-2">
+              <button
+                onClick={() => handleEdit(machine)}
+                className="rounded-full p-2 text-blue-500 hover:bg-blue-50"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onDelete(machine.id)}
+                className="rounded-full p-2 text-red-500 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-start space-x-4">
             <div className="relative">
               <div
@@ -110,7 +112,10 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
               </div>
               <div className="h-2 rounded-full bg-secondary">
                 <div
-                  className="h-full rounded-full bg-green-500 transition-all duration-500"
+                  className={cn(
+                    "h-full rounded-full bg-green-500",
+                    machine.status === "online" ? "transition-all duration-500" : ""
+                  )}
                   style={{ width: `${machine.cpuUsage}%` }}
                 />
               </div>
@@ -122,7 +127,10 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
               </div>
               <div className="h-2 rounded-full bg-secondary">
                 <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                  className={cn(
+                    "h-full rounded-full bg-blue-500",
+                    machine.status === "online" ? "transition-all duration-500" : ""
+                  )}
                   style={{ width: `${machine.memoryUsage}%` }}
                 />
               </div>
