@@ -15,6 +15,7 @@ interface MachineStore {
   addMachine: (machine: Omit<Machine, 'id'>) => void
   deleteMachine: (id: string) => void
   updateMachineStats: () => void
+  renameMachine: (id: string, newName: string) => void
 }
 
 export const useMachineStore = create<MachineStore>((set) => ({
@@ -50,12 +51,19 @@ export const useMachineStore = create<MachineStore>((set) => ({
     set((state) => ({
       machines: state.machines.filter((m) => m.id !== id),
     })),
+  renameMachine: (id, newName) =>
+    set((state) => ({
+      machines: state.machines.map((m) =>
+        m.id === id ? { ...m, name: newName } : m
+      ),
+    })),
   updateMachineStats: () =>
     set((state) => ({
       machines: state.machines.map((machine) => ({
         ...machine,
         cpuUsage: Math.min(100, Math.max(0, machine.cpuUsage + (Math.random() - 0.5) * 10)),
         memoryUsage: Math.min(100, Math.max(0, machine.memoryUsage + (Math.random() - 0.5) * 5)),
+        status: Math.random() > 0.95 ? (machine.status === 'online' ? 'offline' : 'online') : machine.status,
       })),
     })),
 }))
