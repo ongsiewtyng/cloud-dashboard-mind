@@ -42,14 +42,36 @@
   .widget {
     @apply glassmorphic rounded-lg p-4 transition-all duration-200 hover:shadow-lg;
   }
+}
 
-  .fade-in {
-    @apply animate-in fade-in duration-500;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-  .slide-in {
-    @apply animate-in slide-in-from-bottom duration-500;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.slide-in {
+  animation: slideIn 0.5s ease-out forwards;
 }
 
 @keyframes float {
