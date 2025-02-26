@@ -1,5 +1,5 @@
 
-import { Machine } from "@/lib/machine-service"
+import { Machine, useMachineStore } from "@/lib/machine-service"
 import { Server, Trash2, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
@@ -13,6 +13,7 @@ interface MachineListProps {
 export function MachineList({ machines, onDelete }: MachineListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
+  const renameMachine = useMachineStore((state) => state.renameMachine)
   
   const handleEdit = (machine: Machine) => {
     setEditingId(machine.id)
@@ -21,8 +22,6 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
 
   const handleSave = (id: string) => {
     if (editingName.trim()) {
-      // Get the renameMachine function from the store
-      const { renameMachine } = require("@/lib/machine-service").useMachineStore.getState()
       renameMachine(id, editingName.trim())
     }
     setEditingId(null)
