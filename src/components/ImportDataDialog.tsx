@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -11,10 +12,12 @@ import {
 import { Upload, Download } from "lucide-react";
 import Papa from "papaparse";
 import * as React from "react";
+import { useMachineStore } from "@/lib/machine-service";
 
 export function ImportDataDialog() {
     const [open, setOpen] = useState(false);
-    const [csvData, setCsvData] = useState<string[][]>([]); // Parsed CSV data
+    const [csvData, setCsvData] = useState<any[]>([]);
+    const addMachine = useMachineStore((state) => state.addMachine);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
@@ -25,15 +28,37 @@ export function ImportDataDialog() {
                 if (e.target?.result) {
                     const text = e.target.result.toString();
                     const { data } = Papa.parse(text, {
-                        header: true, // Convert to JSON
-                        skipEmptyLines: true
+                        header: true,
+                        skipEmptyLines: true,
+                        transform: (value) => {
+                            // Convert empty strings to 0 for numeric fields
+                            return value === '' ? '0' : value;
+                        }
                     });
 
-                    console.log("Parsed JSON Data:", data); // Debugging
-                    setCsvData(data);
+                    // Process the data to match our MachineRecord interface
+                    const processedData = data.map((row: any) => ({
+                        serial: row.SERIAL || '',
+                        ipAddress: row.IPADDRESS || '',
+                        machineNumber: row.M1 || '',
+                        signalStatus: Number(row.D1) || 0,
+                        totalSignals: Number(row.E1) || 0,
+                        cycleTime: Number(row.E3) || 0,
+                        productionCount: Number(row.C1) || 0,
+                        operatingTime: Number(row.OT) || 0,
+                        downtime: Number(row.UT) || 0,
+                        timestamp: row.TIMESTAMP || '',
+                    }));
+
+                    console.log("Processed Data:", processedData);
+                    setCsvData(processedData);
                     setOpen(true);
 
-                    // Reset file input so it can upload the same file again
+                    // Save each record to Firebase
+                    processedData.forEach((record) => {
+                        addMachine(record);
+                    });
+
                     event.target.value = "";
                 }
             };
@@ -63,7 +88,6 @@ export function ImportDataDialog() {
 
     return (
         <>
-            {/* Upload Button */}
             <Button
                 onClick={() => document.getElementById("file-upload")?.click()}
                 className="flex items-center gap-2 w-full sm:w-auto"
@@ -79,34 +103,41 @@ export function ImportDataDialog() {
                             <DialogTitle className="text-lg font-semibold">Imported Data</DialogTitle>
                         </DialogHeader>
 
-                        {/* Table Container */}
                         <div className="overflow-x-auto border rounded-lg max-h-[60vh] mt-4">
                             <table className="w-full border-collapse border border-gray-300 text-sm sm:text-base">
                                 <thead className="bg-gray-100 sticky top-0 z-10">
-                                <tr>
-                                    {csvData.length > 0 &&
-                                        Object.keys(csvData[0]).map((header, index) => (
-                                            <th key={index} className="border border-gray-300 p-3 text-left">
-                                                {header}
-                                            </th>
-                                        ))}
-                                </tr>
+                                    <tr>
+                                        <th className="border border-gray-300 p-3 text-left">Serial</th>
+                                        <th className="border border-gray-300 p-3 text-left">IP Address</th>
+                                        <th className="border border-gray-300 p-3 text-left">Machine Number</th>
+                                        <th className="border border-gray-300 p-3 text-left">Signal Status</th>
+                                        <th className="border border-gray-300 p-3 text-left">Total Signals</th>
+                                        <th className="border border-gray-300 p-3 text-left">Cycle Time</th>
+                                        <th className="border border-gray-300 p-3 text-left">Production Count</th>
+                                        <th className="border border-gray-300 p-3 text-left">Operating Time</th>
+                                        <th className="border border-gray-300 p-3 text-left">Downtime</th>
+                                        <th className="border border-gray-300 p-3 text-left">Timestamp</th>
+                                    </tr>
                                 </thead>
                                 <tbody className="bg-white">
-                                {csvData.map((row, rowIndex) => (
-                                    <tr key={rowIndex} className="hover:bg-gray-50 even:bg-gray-50">
-                                        {Object.values(row).map((cell, cellIndex) => (
-                                            <td key={cellIndex} className="border border-gray-300 p-2">
-                                                {cell}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
+                                    {csvData.map((row, rowIndex) => (
+                                        <tr key={rowIndex} className="hover:bg-gray-50 even:bg-gray-50">
+                                            <td className="border border-gray-300 p-2">{row.serial}</td>
+                                            <td className="border border-gray-300 p-2">{row.ipAddress}</td>
+                                            <td className="border border-gray-300 p-2">{row.machineNumber}</td>
+                                            <td className="border border-gray-300 p-2">{row.signalStatus}</td>
+                                            <td className="border border-gray-300 p-2">{row.totalSignals}</td>
+                                            <td className="border border-gray-300 p-2">{row.cycleTime}</td>
+                                            <td className="border border-gray-300 p-2">{row.productionCount}</td>
+                                            <td className="border border-gray-300 p-2">{row.operatingTime}</td>
+                                            <td className="border border-gray-300 p-2">{row.downtime}</td>
+                                            <td className="border border-gray-300 p-2">{row.timestamp}</td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* Export Button */}
                         <div className="flex justify-center mt-6">
                             <Button onClick={handleExport} className="w-full sm:w-auto flex items-center gap-2">
                                 <Download className="h-4 w-4" />
@@ -117,7 +148,6 @@ export function ImportDataDialog() {
                 </DialogContent>
             </Dialog>
 
-            {/* Hidden File Input */}
             <input
                 id="file-upload"
                 type="file"
