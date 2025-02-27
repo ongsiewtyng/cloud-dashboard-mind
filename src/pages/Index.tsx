@@ -10,8 +10,10 @@ const Index = () => {
     const { machines, addMachine, deleteMachine, updateMachineStats, fetchMachines } = useMachineStore();
 
     useEffect(() => {
-        // Add example machines if none exist
-        if (machines.length === 0) {
+        const hasInitialized = localStorage.getItem('hasInitializedMachines');
+        
+        // Add example machines only if they haven't been initialized before
+        if (!hasInitialized && machines.length === 0) {
             const exampleMachines = [
                 {
                     serial: "MC-001",
@@ -52,6 +54,7 @@ const Index = () => {
             ];
 
             exampleMachines.forEach(machine => addMachine(machine));
+            localStorage.setItem('hasInitializedMachines', 'true');
         }
 
         fetchMachines();
