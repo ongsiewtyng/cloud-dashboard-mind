@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Upload, Download } from "lucide-react";
 import Papa from "papaparse";
+import * as React from "react";
 
 export function ImportDataDialog() {
     const [open, setOpen] = useState(false);
@@ -23,9 +24,17 @@ export function ImportDataDialog() {
             reader.onload = (e) => {
                 if (e.target?.result) {
                     const text = e.target.result.toString();
-                    const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true });
+                    const { data } = Papa.parse(text, {
+                        header: true, // Convert to JSON
+                        skipEmptyLines: true
+                    });
+
+                    console.log("Parsed JSON Data:", data); // Debugging
                     setCsvData(data);
-                    setOpen(true); // Open the modal after parsing data
+                    setOpen(true);
+
+                    // Reset file input so it can upload the same file again
+                    event.target.value = "";
                 }
             };
 
@@ -75,17 +84,18 @@ export function ImportDataDialog() {
                             <table className="w-full border-collapse border border-gray-300 text-sm sm:text-base">
                                 <thead className="bg-gray-100 sticky top-0 z-10">
                                 <tr>
-                                    {csvData[0]?.map((header, index) => (
-                                        <th key={index} className="border border-gray-300 p-3 text-left">
-                                            {header}
-                                        </th>
-                                    ))}
+                                    {csvData.length > 0 &&
+                                        Object.keys(csvData[0]).map((header, index) => (
+                                            <th key={index} className="border border-gray-300 p-3 text-left">
+                                                {header}
+                                            </th>
+                                        ))}
                                 </tr>
                                 </thead>
                                 <tbody className="bg-white">
-                                {csvData.slice(1).map((row, rowIndex) => (
+                                {csvData.map((row, rowIndex) => (
                                     <tr key={rowIndex} className="hover:bg-gray-50 even:bg-gray-50">
-                                        {row.map((cell, cellIndex) => (
+                                        {Object.values(row).map((cell, cellIndex) => (
                                             <td key={cellIndex} className="border border-gray-300 p-2">
                                                 {cell}
                                             </td>
