@@ -10,13 +10,57 @@ const Index = () => {
     const { machines, addMachine, deleteMachine, updateMachineStats, fetchMachines } = useMachineStore();
 
     useEffect(() => {
+        // Add example machines if none exist
+        if (machines.length === 0) {
+            const exampleMachines = [
+                {
+                    serial: "MC-001",
+                    ipAddress: "192.168.1.101",
+                    machineNumber: "M1",
+                    signalStatus: 1,
+                    totalSignals: 150,
+                    cycleTime: 45.5,
+                    productionCount: 75,
+                    operatingTime: 3600,
+                    downtime: 120,
+                    timestamp: new Date().toLocaleTimeString(),
+                },
+                {
+                    serial: "MC-002",
+                    ipAddress: "192.168.1.102",
+                    machineNumber: "M2",
+                    signalStatus: 0,
+                    totalSignals: 100,
+                    cycleTime: 38.2,
+                    productionCount: 50,
+                    operatingTime: 2400,
+                    downtime: 300,
+                    timestamp: new Date().toLocaleTimeString(),
+                },
+                {
+                    serial: "MC-003",
+                    ipAddress: "192.168.1.103",
+                    machineNumber: "M3",
+                    signalStatus: 1,
+                    totalSignals: 200,
+                    cycleTime: 52.8,
+                    productionCount: 90,
+                    operatingTime: 4800,
+                    downtime: 60,
+                    timestamp: new Date().toLocaleTimeString(),
+                }
+            ];
+
+            exampleMachines.forEach(machine => addMachine(machine));
+        }
+
         fetchMachines();
         const interval = setInterval(() => {
             updateMachineStats();
         }, 2000);
 
         return () => clearInterval(interval);
-    }, [updateMachineStats, fetchMachines]);
+    }, [updateMachineStats, fetchMachines, addMachine, machines.length]);
 
     const handleAddMachine = (machineData: any) => {
         addMachine({
