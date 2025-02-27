@@ -1,13 +1,12 @@
 
 import { useEffect } from "react";
-import { MachineList } from "@/components/MachineList";
 import { AddMachineDialog } from "@/components/AddMachineDialog";
 import { ImportDataDialog } from "@/components/ImportDataDialog";
 import { UsageChart } from "@/components/UsageChart";
 import { useMachineStore } from "@/lib/machine-service";
 
 const Index = () => {
-    const { machines, addMachine, deleteMachine, updateMachineStats, fetchMachines } = useMachineStore();
+    const { machines, addMachine, updateMachineStats, fetchMachines } = useMachineStore();
 
     useEffect(() => {
         const hasInitialized = localStorage.getItem('hasInitializedMachines');
@@ -92,10 +91,6 @@ const Index = () => {
 
             <div className="slide-in">
                 <UsageChart machines={machines} />
-            </div>
-
-            <div className="fade-in">
-                <MachineList machines={machines} onDelete={deleteMachine} />
             </div>
         </div>
     );
