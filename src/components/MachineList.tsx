@@ -28,7 +28,7 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
             <div className="relative">
               <div className={cn(
                 "rounded-full p-2",
-                machine.signalStatus === 1
+                (machine.signalStatus ?? 0) === 1
                   ? "bg-green-50 text-green-500"
                   : "bg-red-50 text-red-500"
               )}>
@@ -36,18 +36,18 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
               </div>
               <div className={cn(
                 "absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white",
-                machine.signalStatus === 1
+                (machine.signalStatus ?? 0) === 1
                   ? "bg-green-500 animate-pulse"
                   : "bg-red-500"
               )} />
             </div>
             <div className="space-y-1 flex-1">
-              <h3 className="font-medium">{machine.machineNumber}</h3>
+              <h3 className="font-medium">{machine.machineNumber || 'Unknown'}</h3>
               <div className="text-sm text-muted-foreground">
-                Serial: {machine.serial}
+                Serial: {machine.serial || 'N/A'}
               </div>
               <div className="text-sm text-muted-foreground">
-                IP: {machine.ipAddress}
+                IP: {machine.ipAddress || 'N/A'}
               </div>
             </div>
           </div>
@@ -55,30 +55,30 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span>Cycle Time</span>
-                <span>{machine.cycleTime.toFixed(1)}s</span>
+                <span>{(machine.cycleTime ?? 0).toFixed(1)}s</span>
               </div>
               <div className="h-2 rounded-full bg-secondary">
                 <div
                   className={cn(
                     "h-full rounded-full bg-green-500",
-                    machine.signalStatus === 1 ? "transition-all duration-500" : ""
+                    (machine.signalStatus ?? 0) === 1 ? "transition-all duration-500" : ""
                   )}
-                  style={{ width: `${(machine.cycleTime / 100) * 100}%` }}
+                  style={{ width: `${((machine.cycleTime ?? 0) / 100) * 100}%` }}
                 />
               </div>
             </div>
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span>Production Count</span>
-                <span>{machine.productionCount}</span>
+                <span>{machine.productionCount ?? 0}</span>
               </div>
               <div className="h-2 rounded-full bg-secondary">
                 <div
                   className={cn(
                     "h-full rounded-full bg-blue-500",
-                    machine.signalStatus === 1 ? "transition-all duration-500" : ""
+                    (machine.signalStatus ?? 0) === 1 ? "transition-all duration-500" : ""
                   )}
-                  style={{ width: `${(machine.productionCount / 100) * 100}%` }}
+                  style={{ width: `${((machine.productionCount ?? 0) / 100) * 100}%` }}
                 />
               </div>
             </div>
