@@ -1,12 +1,13 @@
+
 import { useEffect } from "react";
 import { MachineList } from "@/components/MachineList";
 import { AddMachineDialog } from "@/components/AddMachineDialog";
-import { ImportDataDialog } from "@/components/ImportDataDialog"; // ✅ Import
+import { ImportDataDialog } from "@/components/ImportDataDialog";
 import { UsageChart } from "@/components/UsageChart";
 import { useMachineStore } from "@/lib/machine-service";
 
 const Index = () => {
-    const { machines, addMachine, deleteMachine, updateMachineStats,fetchMachines } = useMachineStore();
+    const { machines, addMachine, deleteMachine, updateMachineStats, fetchMachines } = useMachineStore();
 
     useEffect(() => {
         fetchMachines();
@@ -15,15 +16,20 @@ const Index = () => {
         }, 2000);
 
         return () => clearInterval(interval);
-    }, [updateMachineStats]);
+    }, [updateMachineStats, fetchMachines]);
 
-    const handleAddMachine = (name: string) => {
+    const handleAddMachine = (machineData: any) => {
         addMachine({
-            name,
-            status: "online",
-            cpuUsage: Math.random() * 50,
-            memoryUsage: Math.random() * 50,
-            uptimeHours: 0,
+            serial: machineData.serial || '',
+            ipAddress: machineData.ipAddress || '',
+            machineNumber: machineData.machineNumber || '',
+            signalStatus: 0,
+            totalSignals: 0,
+            cycleTime: 0,
+            productionCount: 0,
+            operatingTime: 0,
+            downtime: 0,
+            timestamp: new Date().toLocaleTimeString(),
         });
     };
 
@@ -32,7 +38,7 @@ const Index = () => {
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
                 <div className="flex gap-4">
-                    <ImportDataDialog /> {/* ✅ Import CSV Button */}
+                    <ImportDataDialog />
                     <AddMachineDialog onAdd={handleAddMachine} />
                 </div>
             </div>

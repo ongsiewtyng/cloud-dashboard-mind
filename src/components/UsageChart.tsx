@@ -1,23 +1,23 @@
 
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Machine } from "@/lib/machine-service"
+import { MachineRecord } from "@/lib/machine-service"
 
 interface UsageChartProps {
-  machines: Machine[]
+  machines: MachineRecord[]
 }
 
 export function UsageChart({ machines }: UsageChartProps) {
   const data = machines.map((machine) => ({
-    name: machine.name,
-    cpu: machine.cpuUsage,
-    memory: machine.memoryUsage,
+    name: machine.machineNumber,
+    cycle: machine.cycleTime,
+    production: machine.productionCount,
   }))
 
   return (
     <Card className="widget">
       <CardHeader>
-        <CardTitle>Resource Usage Overview</CardTitle>
+        <CardTitle>Machine Performance Overview</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[200px]">
@@ -28,14 +28,16 @@ export function UsageChart({ machines }: UsageChartProps) {
               <Tooltip />
               <Line
                 type="monotone"
-                dataKey="cpu"
+                dataKey="cycle"
+                name="Cycle Time"
                 stroke="#22c55e"
                 strokeWidth={2}
                 dot={false}
               />
               <Line
                 type="monotone"
-                dataKey="memory"
+                dataKey="production"
+                name="Production Count"
                 stroke="#3b82f6"
                 strokeWidth={2}
                 dot={false}
