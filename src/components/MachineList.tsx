@@ -29,22 +29,22 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
               <div className="relative">
                 <div className={cn(
                     "rounded-full p-2",
-                    (machine.signalStatus ?? 0) === 1 ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500"
+                    (machine.dataHistory?.latestData?.signalON === "1") ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500"
                 )}>
                   <Server className="h-5 w-5" />
                 </div>
                 <div className={cn(
                     "absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white",
-                    (machine.signalStatus ?? 0) === 1 ? "bg-green-500 animate-pulse" : "bg-red-500"
+                    (machine.dataHistory?.latestData?.signalON === "1") ? "bg-green-500 animate-pulse" : "bg-red-500"
                 )} />
               </div>
               <div className="space-y-1 flex-1">
-                <h3 className="font-medium">{machine.machineNumber || 'Unknown'}</h3>
+                <h3 className="font-medium">{machine.dataHistory?.latestData?.machineNumber || 'Unknown'}</h3>
                 <div className="text-sm text-muted-foreground">
-                  Serial: {machine.serial || 'N/A'}
+                  Serial: {machine.dataHistory?.latestData?.serialNumber || 'N/A'}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  IP: {machine.ipAddress || 'N/A'}
+                  IP: {machine.dataHistory?.latestData?.ipAddress || 'N/A'}
                 </div>
               </div>
             </div>
@@ -52,30 +52,30 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span>Cycle Time</span>
-                  <span>{(machine.cycleTime ?? 0).toFixed(1)}s</span>
+                  <span>{parseFloat(machine.dataHistory?.latestData?.cycleTime || "0").toFixed(1)}s</span>
                 </div>
                 <div className="h-2 rounded-full bg-secondary">
                   <div
                       className={cn(
                           "h-full rounded-full bg-green-500",
-                          (machine.signalStatus ?? 0) === 1 ? "transition-all duration-500" : ""
+                          (machine.dataHistory?.latestData?.signalON === "1") ? "transition-all duration-500" : ""
                       )}
-                      style={{ width: `${((machine.cycleTime ?? 0) / 100) * 100}%` }}
+                      style={{ width: `${Math.min((parseFloat(machine.dataHistory?.latestData?.cycleTime || "0") / 200) * 100, 100)}%` }}
                   />
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span>Production Count</span>
-                  <span>{machine.productionCount ?? 0}</span>
+                  <span>{machine.dataHistory?.latestData?.productionResults || "0"}</span>
                 </div>
                 <div className="h-2 rounded-full bg-secondary">
                   <div
                       className={cn(
                           "h-full rounded-full bg-blue-500",
-                          (machine.signalStatus ?? 0) === 1 ? "transition-all duration-500" : ""
+                          (machine.dataHistory?.latestData?.signalON === "1") ? "transition-all duration-500" : ""
                       )}
-                      style={{ width: `${((machine.productionCount ?? 0) / 100) * 100}%` }}
+                      style={{ width: `${Math.min((parseInt(machine.dataHistory?.latestData?.productionResults || "0", 10) / 400) * 100, 100)}%` }}
                   />
                 </div>
               </div>

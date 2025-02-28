@@ -16,40 +16,55 @@ const Index = () => {
         if (!hasInitialized && machines.length === 0) {
             const exampleMachines = [
                 {
-                    serial: "MC-001",
-                    ipAddress: "192.168.1.101",
-                    machineNumber: "M1",
-                    signalStatus: 1,
-                    totalSignals: 150,
-                    cycleTime: 45.5,
-                    productionCount: 75,
-                    operatingTime: 3600,
-                    downtime: 120,
-                    timestamp: new Date().toLocaleTimeString(),
+                    dataHistory: {
+                        latestData: {
+                            serialNumber: "MC-001",
+                            ipAddress: "192.168.1.101",
+                            machineNumber: "M1",
+                            signalON: "1",
+                            totalSignal: "150",
+                            cycleTime: "45.5",
+                            productionResults: "75",
+                            operatingTime: "3600",
+                            downtime: "120",
+                            timestamp: new Date().toLocaleTimeString(),
+                        }
+                    },
+                    latestTimestamp: new Date().toLocaleTimeString(),
                 },
                 {
-                    serial: "MC-002",
-                    ipAddress: "192.168.1.102",
-                    machineNumber: "M2",
-                    signalStatus: 0,
-                    totalSignals: 100,
-                    cycleTime: 38.2,
-                    productionCount: 50,
-                    operatingTime: 2400,
-                    downtime: 300,
-                    timestamp: new Date().toLocaleTimeString(),
+                    dataHistory: {
+                        latestData: {
+                            serialNumber: "MC-002",
+                            ipAddress: "192.168.1.102",
+                            machineNumber: "M2",
+                            signalON: "0",
+                            totalSignal: "100",
+                            cycleTime: "38.2",
+                            productionResults: "50",
+                            operatingTime: "2400",
+                            downtime: "300",
+                            timestamp: new Date().toLocaleTimeString(),
+                        }
+                    },
+                    latestTimestamp: new Date().toLocaleTimeString(),
                 },
                 {
-                    serial: "MC-003",
-                    ipAddress: "192.168.1.103",
-                    machineNumber: "M3",
-                    signalStatus: 1,
-                    totalSignals: 200,
-                    cycleTime: 52.8,
-                    productionCount: 90,
-                    operatingTime: 4800,
-                    downtime: 60,
-                    timestamp: new Date().toLocaleTimeString(),
+                    dataHistory: {
+                        latestData: {
+                            serialNumber: "MC-003",
+                            ipAddress: "192.168.1.103",
+                            machineNumber: "M3",
+                            signalON: "1",
+                            totalSignal: "200",
+                            cycleTime: "52.8",
+                            productionResults: "90",
+                            operatingTime: "4800",
+                            downtime: "60",
+                            timestamp: new Date().toLocaleTimeString(),
+                        }
+                    },
+                    latestTimestamp: new Date().toLocaleTimeString(),
                 }
             ];
 
@@ -67,16 +82,21 @@ const Index = () => {
 
     const handleAddMachine = (machineData: any) => {
         addMachine({
-            serial: machineData.serial || '',
-            ipAddress: machineData.ipAddress || '',
-            machineNumber: machineData.machineNumber || '',
-            signalStatus: 0,
-            totalSignals: 0,
-            cycleTime: 0,
-            productionCount: 0,
-            operatingTime: 0,
-            downtime: 0,
-            timestamp: new Date().toLocaleTimeString(),
+            dataHistory: {
+                latestData: {
+                    serialNumber: machineData.serial || '',
+                    ipAddress: machineData.ipAddress || '',
+                    machineNumber: machineData.machineNumber || '',
+                    signalON: "0",
+                    totalSignal: "0",
+                    cycleTime: "0",
+                    productionResults: "0",
+                    operatingTime: "0",
+                    downtime: "0",
+                    timestamp: new Date().toLocaleTimeString(),
+                }
+            },
+            latestTimestamp: new Date().toLocaleTimeString(),
         });
     };
 

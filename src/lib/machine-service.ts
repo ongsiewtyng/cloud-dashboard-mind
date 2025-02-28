@@ -4,22 +4,24 @@ import {db} from "@/lib/firebase";
 import {ref, push, remove, update, get} from "firebase/database";
 
 export interface MachineLatestData {
-    machineNumber: string;
-    serialNumber: string;
+    cycleTime: string;
+    downtime: string;
     ipAddress: string;
-    signalON: number;
-    totalSignals: number;
-    cycleTime: number;
-    productionResults: number;
-    operatingTime: number;
-    downtime: number;
+    machineNumber: string;
+    operatingTime: string;
+    productionResults: string;
+    serialNumber: string;
+    signalON: string;
+    timestamp: string;
+    totalSignal: string;
 }
 
 export interface MachineRecord {
+    id: string;
     dataHistory: {
         latestData: MachineLatestData;
-        latestTimestamp: string;
     };
+    latestTimestamp: string;
 }
 
 interface MachineStore {
@@ -68,6 +70,7 @@ export const useMachineStore = create<MachineStore>((set) => ({
                     ...machinesData[key],
                 }));
                 set({ machines });
+                console.log("Fetched machines:", machines);
             } else {
                 console.log("No data available");
             }
