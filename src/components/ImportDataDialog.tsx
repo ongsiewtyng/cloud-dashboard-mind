@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,12 +11,14 @@ import {
 import { Upload, Download } from "lucide-react";
 import Papa from "papaparse";
 import * as React from "react";
-import { useMachineStore } from "@/lib/machine-service";
+import { db } from "@/lib/firebase"; // Import Firebase Realtime DB instance
+import { ref, set, update, get } from "firebase/database";
 
 export function ImportDataDialog() {
     const [open, setOpen] = useState(false);
     const [csvData, setCsvData] = useState<any[]>([]);
-    const addMachine = useMachineStore((state) => state.addMachine);
+    const [headers, setHeaders] = useState<string[]>([]);
+    const [subheaders, setSubheaders] = useState<string[]>([]);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
@@ -26,46 +27,40 @@ export function ImportDataDialog() {
 
             reader.onload = (e) => {
                 if (e.target?.result) {
-                    const text = e.target.result.toString();
+                    const decoder = new TextDecoder("windows-1252");
+                    const text = decoder.decode(e.target.result as ArrayBuffer);
+
                     const { data } = Papa.parse(text, {
-                        header: true,
-                        skipEmptyLines: true,
-                        transform: (value) => {
-                            // Convert empty strings to 0 for numeric fields
-                            return value === '' ? '0' : value;
-                        }
+                        header: false, // Read raw data, not as key-value pairs
+                        skipEmptyLines: true
                     });
 
-                    // Process the data to match our MachineRecord interface
-                    const processedData = data.map((row: any) => ({
-                        serial: row.SERIAL || '',
-                        ipAddress: row.IPADDRESS || '',
-                        machineNumber: row.M1 || '',
-                        signalStatus: Number(row.D1) || 0,
-                        totalSignals: Number(row.E1) || 0,
-                        cycleTime: Number(row.E3) || 0,
-                        productionCount: Number(row.C1) || 0,
-                        operatingTime: Number(row.OT) || 0,
-                        downtime: Number(row.UT) || 0,
-                        timestamp: row.TIMESTAMP || '',
-                    }));
+                    if (data.length < 2) {
+                        console.error("Invalid CSV: Not enough rows");
+                        return;
+                    }
 
-                    console.log("Processed Data:", processedData);
-                    setCsvData(processedData);
+                    const headers = data[0] as string[]; // First row as headers
+                    const subheaders = data[1] as string[]; // Second row as subheaders
+                    const csvData = data.slice(2).map(row => Object.values(row)); // Convert remaining rows into array format
+
+                    setHeaders(headers);
+                    setSubheaders(subheaders);
+                    setCsvData(csvData);
+
+                    console.log("Headers:", headers);
+                    console.log("Subheaders:", subheaders);
+                    console.log("Data:", csvData);
+
                     setOpen(true);
-
-                    // Save each record to Firebase
-                    processedData.forEach((record) => {
-                        addMachine(record);
-                    });
-
-                    event.target.value = "";
                 }
+                event.target.value = ""; // Reset file input
             };
 
-            reader.readAsText(file);
+            reader.readAsArrayBuffer(file);
         }
     };
+
 
     useEffect(() => {
         if (open) {
@@ -74,6 +69,62 @@ export function ImportDataDialog() {
             document.body.style.overflow = "";
         }
     }, [open]);
+
+    const saveData = async () => {
+        if (!subheaders.includes("SERIAL")) {
+            console.error("SERIAL column not found in the CSV headers.");
+            return;
+        }
+
+        // Find index of the SERIAL column
+        const serialIndex = subheaders.indexOf("SERIAL");
+
+        if (serialIndex === -1) {
+            console.error("SERIAL column index not found.");
+            return;
+        }
+
+        const machinesRef = ref(db, "machines");
+
+        //Fetch existing machines
+        const snapshot = await get(machinesRef);
+
+        // Store existing machine serials
+        const existingSerialNumbers = new Set(csvData.map(row => row[serialIndex]));
+
+        console.log("Existing Machines (Serial Numbers):", existingSerialNumbers);
+
+        csvData.forEach(row => {
+            if (!row || row.length === 0) return;
+            const serialNumber = row[serialIndex];
+            if (!serialNumber) return;
+
+
+            const machineData = {
+                serialNumber: row[serialIndex] || "",
+                ipAddress: row[subheaders.indexOf("IPADDRESS")] || "",
+                timestamp: row[subheaders.indexOf("TIMESTAMP")] || "",
+                signalON: row[subheaders.indexOf("D1")] || "0",
+                totalSignal: row[subheaders.indexOf("E1")] || "0",
+                cycleTime: row[subheaders.indexOf("E3")] || "0:00:00",
+                productionResults: row[subheaders.indexOf("C1")] || "0",
+                machineNumber: row[subheaders.indexOf("M1")] || "",
+                operatingTime: row[subheaders.indexOf("OT")] || "0:00:00",
+                downtime: row[subheaders.indexOf("UT")] || "0:00:00"
+            };
+
+            const machinePath = `machines/${serialNumber}`;
+            const timestampKey = `timestamp_${machineData.timestamp}`;
+
+            update(ref(db, machinePath), {
+                latestTimestamp: machineData.timestamp,
+                latestData: machineData
+            });
+
+            set(ref(db, `${machinePath}/dataHistory/${timestampKey}`), machineData);
+        });
+    }
+
 
     const handleExport = () => {
         const csvString = Papa.unparse(csvData);
@@ -105,40 +156,47 @@ export function ImportDataDialog() {
 
                         <div className="overflow-x-auto border rounded-lg max-h-[60vh] mt-4">
                             <table className="w-full border-collapse border border-gray-300 text-sm sm:text-base">
+                                {/* Dynamically generated headers */}
                                 <thead className="bg-gray-100 sticky top-0 z-10">
-                                    <tr>
-                                        <th className="border border-gray-300 p-3 text-left">Serial</th>
-                                        <th className="border border-gray-300 p-3 text-left">IP Address</th>
-                                        <th className="border border-gray-300 p-3 text-left">Machine Number</th>
-                                        <th className="border border-gray-300 p-3 text-left">Signal Status</th>
-                                        <th className="border border-gray-300 p-3 text-left">Total Signals</th>
-                                        <th className="border border-gray-300 p-3 text-left">Cycle Time</th>
-                                        <th className="border border-gray-300 p-3 text-left">Production Count</th>
-                                        <th className="border border-gray-300 p-3 text-left">Operating Time</th>
-                                        <th className="border border-gray-300 p-3 text-left">Downtime</th>
-                                        <th className="border border-gray-300 p-3 text-left">Timestamp</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white">
-                                    {csvData.map((row, rowIndex) => (
-                                        <tr key={rowIndex} className="hover:bg-gray-50 even:bg-gray-50">
-                                            <td className="border border-gray-300 p-2">{row.serial}</td>
-                                            <td className="border border-gray-300 p-2">{row.ipAddress}</td>
-                                            <td className="border border-gray-300 p-2">{row.machineNumber}</td>
-                                            <td className="border border-gray-300 p-2">{row.signalStatus}</td>
-                                            <td className="border border-gray-300 p-2">{row.totalSignals}</td>
-                                            <td className="border border-gray-300 p-2">{row.cycleTime}</td>
-                                            <td className="border border-gray-300 p-2">{row.productionCount}</td>
-                                            <td className="border border-gray-300 p-2">{row.operatingTime}</td>
-                                            <td className="border border-gray-300 p-2">{row.downtime}</td>
-                                            <td className="border border-gray-300 p-2">{row.timestamp}</td>
-                                        </tr>
+                                <tr>
+                                    {(Array.isArray(headers) ? headers : []).map((header, index) => (
+                                        <th key={index} className="border border-gray-300 p-3 text-left">
+                                            {header}
+                                        </th>
                                     ))}
+                                </tr>
+                                </thead>
+
+                                {/* Dynamically generated subheaders */}
+                                <thead className="bg-gray-50">
+                                <tr>
+                                    {(Array.isArray(subheaders) ? subheaders : []).map((subheader, index) => (
+                                        <th key={index} className="border border-gray-300 p-3 text-left">
+                                            {subheader}
+                                        </th>
+                                    ))}
+                                </tr>
+                                </thead>
+
+                                {/* Dynamically generated rows */}
+                                <tbody className="bg-white">
+                                {csvData.map((row, index) => (
+                                    <tr key={index}>
+                                        {row.map((cell, cellIndex) => (
+                                            <td key={cellIndex} className="border border-gray-300 p-3">
+                                                {cell}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
                                 </tbody>
                             </table>
                         </div>
 
-                        <div className="flex justify-center mt-6">
+                        <div className="flex justify-center mt-6 gap-4">
+                            <Button onClick={saveData} className="w-full sm:w-auto flex items-center gap-2">
+                                Save Data
+                            </Button>
                             <Button onClick={handleExport} className="w-full sm:w-auto flex items-center gap-2">
                                 <Download className="h-4 w-4" />
                                 Export as CSV

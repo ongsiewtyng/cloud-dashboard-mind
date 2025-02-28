@@ -3,18 +3,23 @@ import {create} from 'zustand'
 import {db} from "@/lib/firebase";
 import {ref, push, remove, update, get} from "firebase/database";
 
-export interface MachineRecord {
-    id: string;
-    serial: string;
-    ipAddress: string;
+export interface MachineLatestData {
     machineNumber: string;
-    signalStatus: number;
+    serialNumber: string;
+    ipAddress: string;
+    signalON: number;
     totalSignals: number;
     cycleTime: number;
-    productionCount: number;
+    productionResults: number;
     operatingTime: number;
     downtime: number;
-    timestamp: string;
+}
+
+export interface MachineRecord {
+    dataHistory: {
+        latestData: MachineLatestData;
+        latestTimestamp: string;
+    };
 }
 
 interface MachineStore {
