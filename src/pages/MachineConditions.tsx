@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMachineStore } from "@/lib/machine-service";
 import { MachineList } from "@/components/MachineList";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,7 +7,6 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 
@@ -23,7 +22,14 @@ const MachineConditions = () => {
   }>>([]);
   const [newLogReason, setNewLogReason] = useState("");
 
+  // Debugging
+  useEffect(() => {
+    console.log("Selected machine:", selectedMachine);
+    console.log("Available machines:", machines);
+  }, [selectedMachine, machines]);
+
   const handleMachineClick = (machineId: string) => {
+    console.log("Machine clicked:", machineId);
     setSelectedMachine(machineId);
   };
 
@@ -49,8 +55,8 @@ const MachineConditions = () => {
   const selectedMachineData = machines.find(m => m.id === selectedMachine);
 
   return (
-    <div className="container mx-auto p-6 flex h-[calc(100vh-4rem)]">
-      <div className={`fade-in flex-1 transition-all duration-300 ${selectedMachine ? 'mr-4' : ''}`}>
+    <div className="container mx-auto p-6 flex flex-col md:flex-row h-[calc(100vh-4rem)]">
+      <div className={`fade-in flex-1 transition-all duration-300 ${selectedMachine ? 'md:mr-4 mb-4 md:mb-0' : ''}`}>
         <h1 className="text-3xl font-semibold tracking-tight mb-6">Machine Conditions</h1>
         
         <MachineList 
@@ -62,7 +68,7 @@ const MachineConditions = () => {
       </div>
 
       {selectedMachine && (
-        <div className="w-1/3 bg-white rounded-lg shadow-lg border transition-all duration-300 slide-in">
+        <div className="w-full md:w-1/3 bg-white rounded-lg shadow-lg border transition-all duration-300 slide-in">
           <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
             <h2 className="text-xl font-semibold">
               Machine {selectedMachineData?.latestData?.machineNumber}

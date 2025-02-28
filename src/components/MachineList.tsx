@@ -15,6 +15,11 @@ export function MachineList({ machines, onDelete, onMachineClick, selectedMachin
     return <p className="text-gray-500">No machines available</p>;
   }
 
+  const handleMachineClick = (id: string) => {
+    console.log("Machine clicked in MachineList:", id);
+    onMachineClick && onMachineClick(id);
+  };
+
   return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {machines.map((machine) => (
@@ -25,7 +30,7 @@ export function MachineList({ machines, onDelete, onMachineClick, selectedMachin
               selectedMachineId === machine.id ? "ring-2 ring-primary ring-offset-2" : "",
               onMachineClick ? "hover:shadow-md transform hover:-translate-y-1" : ""
             )}
-            onClick={() => onMachineClick && onMachineClick(machine.id)}
+            onClick={() => handleMachineClick(machine.id)}
           >
             <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100 z-10">
               <button

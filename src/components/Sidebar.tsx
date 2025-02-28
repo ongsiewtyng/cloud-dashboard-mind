@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu, X, LayoutDashboard, Server } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,35 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   
+  // Auto close sidebar on mobile when route changes
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsOpen(false);
+    }
+  }, [location.pathname]);
+
+  // Auto close sidebar on mobile when clicking outside
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsOpen(true); // Auto-open on large screens
+      } else {
+        setIsOpen(false); // Auto-close on small screens
+      }
+    };
+
+    // Set initial state based on screen size
+    handleResize();
+
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
