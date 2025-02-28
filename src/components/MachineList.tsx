@@ -1,14 +1,16 @@
 
-import { MachineRecord, MachineLatestData } from "@/lib/machine-service"
+import { MachineRecord } from "@/lib/machine-service"
 import { Server, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface MachineListProps {
   machines: MachineRecord[]
   onDelete: (id: string) => void
+  onMachineClick?: (id: string) => void
+  selectedMachineId?: string | null
 }
 
-export function MachineList({ machines, onDelete }: MachineListProps) {
+export function MachineList({ machines, onDelete, onMachineClick, selectedMachineId }: MachineListProps) {
   if (!machines || machines.length === 0) {
     return <p className="text-gray-500">No machines available</p>;
   }
@@ -16,10 +18,21 @@ export function MachineList({ machines, onDelete }: MachineListProps) {
   return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {machines.map((machine) => (
-          <div key={machine.id} className="widget group relative overflow-hidden">
-            <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <div 
+            key={machine.id} 
+            className={cn(
+              "widget group relative overflow-hidden cursor-pointer transition-all duration-200",
+              selectedMachineId === machine.id ? "ring-2 ring-primary ring-offset-2" : "",
+              onMachineClick ? "hover:shadow-md transform hover:-translate-y-1" : ""
+            )}
+            onClick={() => onMachineClick && onMachineClick(machine.id)}
+          >
+            <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100 z-10">
               <button
-                  onClick={() => onDelete(machine.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(machine.id);
+                  }}
                   className="rounded-full p-2 text-red-500 hover:bg-red-50"
               >
                 <Trash2 className="h-4 w-4" />
