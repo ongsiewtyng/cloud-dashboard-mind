@@ -18,9 +18,8 @@ export interface MachineLatestData {
 
 export interface MachineRecord {
     id: string;
-    dataHistory: {
-        latestData: MachineLatestData;
-    };
+    dataHistory: any; // This contains timestamp data
+    latestData: MachineLatestData;
     latestTimestamp: string;
 }
 

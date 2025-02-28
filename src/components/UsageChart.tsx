@@ -9,9 +9,9 @@ interface UsageChartProps {
 
 export function UsageChart({ machines }: UsageChartProps) {
   const data = machines.map((machine) => ({
-    name: machine.dataHistory?.latestData?.machineNumber || 'Unknown',
-    cycle: parseFloat(machine.dataHistory?.latestData?.cycleTime || "0"),
-    production: parseInt(machine.dataHistory?.latestData?.productionResults || "0", 10),
+    name: machine.latestData?.machineNumber || 'Unknown',
+    cycle: parseFloat(machine.latestData?.cycleTime || "0"),
+    production: parseInt(machine.latestData?.productionResults || "0", 10),
   }))
 
   return (
