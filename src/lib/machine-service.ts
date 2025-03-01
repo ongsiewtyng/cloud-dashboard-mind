@@ -1,7 +1,7 @@
 
 import {create} from 'zustand'
 import {db} from "@/lib/firebase";
-import {ref, push, remove, update, get} from "firebase/database";
+import {ref, push, remove, update, get, onValue} from "firebase/database";
 
 export interface MachineLatestData {
     cycleTime: string;
@@ -29,6 +29,7 @@ interface MachineStore {
     deleteMachine: (id: string) => void;
     updateMachineStats: () => void;
     fetchMachines: () => void;
+    setupRealtimeUpdates: () => () => void; // Returns cleanup function
 }
 
 export const useMachineStore = create<MachineStore>((set) => ({
@@ -72,9 +73,35 @@ export const useMachineStore = create<MachineStore>((set) => ({
                 console.log("Fetched machines:", machines);
             } else {
                 console.log("No data available");
+                set({ machines: [] });
             }
         }).catch((error) => {
             console.error("Error fetching machines:", error);
         });
     },
+    setupRealtimeUpdates: () => {
+        // Set up a real-time listener for machine data changes
+        const machinesRef = ref(db, "machines");
+        
+        // Create the listener and save the unsubscribe function
+        const unsubscribe = onValue(machinesRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const machinesData = snapshot.val();
+                const machines = Object.keys(machinesData).map((key) => ({
+                    id: key,
+                    ...machinesData[key],
+                }));
+                set({ machines });
+                console.log("Real-time update received:", machines);
+            } else {
+                set({ machines: [] });
+                console.log("No machines data available");
+            }
+        }, (error) => {
+            console.error("Error in real-time machine updates:", error);
+        });
+        
+        // Return the unsubscribe function for cleanup
+        return unsubscribe;
+    }
 }));
