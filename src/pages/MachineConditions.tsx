@@ -55,31 +55,53 @@ const MachineConditions = () => {
   const selectedMachineData = machines.find(m => m.id === selectedMachine);
 
   return (
-    <div className="container mx-auto p-6 flex flex-col md:flex-row h-[calc(100vh-4rem)]">
-      <div className={`fade-in flex-1 transition-all duration-300 ${selectedMachine ? 'md:mr-4 mb-4 md:mb-0' : ''}`}>
-        <h1 className="text-3xl font-semibold tracking-tight mb-6">Machine Conditions</h1>
-        
-        <MachineList 
-          machines={machines} 
-          onDelete={deleteMachine} 
-          onMachineClick={handleMachineClick}
-          selectedMachineId={selectedMachine}
-        />
+    <div className="container mx-auto p-6 flex h-[calc(100vh-4rem)]">
+      {/* Left sidebar with machines list */}
+      <div className="w-64 mr-6 border-r pr-4">
+        <h2 className="text-xl font-semibold mb-4">Machines</h2>
+        <ScrollArea className="h-[calc(100vh-10rem)]">
+          <div className="space-y-2">
+            {machines.map((machine) => (
+              <div 
+                key={machine.id}
+                onClick={() => handleMachineClick(machine.id)}
+                className={`p-3 rounded-md cursor-pointer transition-colors ${
+                  selectedMachine === machine.id 
+                    ? "bg-primary/10 border-l-4 border-primary" 
+                    : "hover:bg-secondary"
+                }`}
+              >
+                <div className="flex items-center">
+                  <div className={`w-3 h-3 rounded-full mr-3 ${
+                    machine.latestData?.signalON === "1" ? "bg-green-500" : "bg-red-500"
+                  }`} />
+                  <div>
+                    <div className="font-medium">Machine {machine.latestData?.machineNumber || "Unknown"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      S/N: {machine.latestData?.serialNumber || "N/A"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
-      {selectedMachine && (
-        <div className="w-full md:w-1/3 bg-white rounded-lg shadow-lg border transition-all duration-300 slide-in">
-          <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
-            <h2 className="text-xl font-semibold">
-              Machine {selectedMachineData?.latestData?.machineNumber}
-            </h2>
-            <Button variant="ghost" size="icon" onClick={handleClosePanel}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+      {/* Main content area */}
+      <div className="flex-1">
+        {selectedMachine ? (
+          <div className="h-full">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-semibold">
+                Machine {selectedMachineData?.latestData?.machineNumber} Details
+              </h1>
+              <Button variant="ghost" size="icon" onClick={handleClosePanel}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
 
-          <ScrollArea className="h-[calc(100vh-15rem)]">
-            <div className="p-4 space-y-6">
+            <div className="grid grid-cols-1 gap-6">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Machine Details</CardTitle>
@@ -233,9 +255,16 @@ const MachineConditions = () => {
                 </CardContent>
               </Card>
             </div>
-          </ScrollArea>
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center text-muted-foreground">
+              <h2 className="text-xl font-medium mb-2">Select a machine</h2>
+              <p>Choose a machine from the sidebar to view its details</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
