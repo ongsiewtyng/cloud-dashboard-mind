@@ -7,7 +7,7 @@ import { UsageChart } from "@/components/UsageChart";
 import { useMachineStore } from "@/lib/machine-service";
 
 const Index = () => {
-    const { machines, addMachine, deleteMachine, fetchMachines, setupRealtimeUpdates } = useMachineStore();
+    const { machines, addMachine, deleteMachine, updateMachineStats, fetchMachines } = useMachineStore();
 
     useEffect(() => {
         const hasInitialized = localStorage.getItem('hasInitializedMachines');
@@ -69,17 +69,13 @@ const Index = () => {
             localStorage.setItem('hasInitializedMachines', 'true');
         }
 
-        // Initial fetch of machines
         fetchMachines();
-        
-        // Set up real-time updates
-        const unsubscribe = setupRealtimeUpdates();
-        
-        // Cleanup when component unmounts
-        return () => {
-            unsubscribe();
-        };
-    }, [fetchMachines, setupRealtimeUpdates, addMachine, machines.length]);
+        const interval = setInterval(() => {
+            updateMachineStats();
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [updateMachineStats, fetchMachines, addMachine, machines.length]);
 
     const handleAddMachine = (machineData: any) => {
         addMachine({

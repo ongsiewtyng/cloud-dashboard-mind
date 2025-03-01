@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { LayoutDashboard, Server, Menu } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -36,9 +35,7 @@ export function Sidebar() {
             {isHovered ? (
                 <h1 className="text-xl font-semibold">Machine Monitor</h1>
             ) : (
-                <div className="flex justify-center w-full">
-                    <Menu className="h-6 w-6" />
-                </div>
+                <span className="text-xl font-semibold"><Menu /></span>
             )}
           </div>
 
