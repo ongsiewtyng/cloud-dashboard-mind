@@ -40,7 +40,7 @@ export function SignalHistory({
       </CardHeader>
       <CardContent>
         <div className="mb-4 space-y-2">
-          <div className="flex items-center gap-4">
+          <div className="flex gap-4">
             {currentStatus === "0" ? (
               <>
                 <div className="flex-1 space-y-1">
@@ -61,11 +61,13 @@ export function SignalHistory({
                     </SelectContent>
                   </Select>
                 </div>
-                <Button 
-                  onClick={() => onAddLog(machineId, "0")}
-                  disabled={!newLogReason}>
-                  Record
-                </Button>
+                <div className="flex items-end">
+                  <Button
+                      onClick={() => onAddLog(machineId, "0")}
+                      disabled={!newLogReason}>
+                    Record
+                  </Button>
+                </div>
               </>
             ) : (
               <Button 
@@ -92,7 +94,7 @@ export function SignalHistory({
                   {log.status === "1" ? "Running" : "Stopped"}
                 </TableCell>
                 <TableCell>{log.timestamp}</TableCell>
-                <TableCell>{log.reason}</TableCell>
+                <TableCell>{log.reason.replace(/\b\w/g, (char) => char.toUpperCase())}</TableCell>
               </TableRow>
             ))}
             {filteredLogs.length === 0 && (
