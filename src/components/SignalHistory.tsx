@@ -152,43 +152,43 @@ export function SignalHistory({
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={timelineData}
-                layout="vertical"
-                margin={{ top: 20, right: 30, left: 70, bottom: 5 }}
+                  data={timelineData}
+                  layout="vertical"
+                  margin={{ top: 20, right: 30, left: 70, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" domain={[0, 1]} ticks={[0, 1]} tickFormatter={(value) => value === 1 ? "On" : "Off"} />
-                <YAxis 
-                  dataKey="timestamp" 
-                  type="category" 
-                  width={60} 
-                  tick={{ fontSize: 12 }} 
+                <YAxis
+                    dataKey="timestamp"
+                    type="category"
+                    width={60}
+                    tick={{ fontSize: 12 }}
                 />
-                <Tooltip 
-                  formatter={(value, name, props) => [
-                    value === 1 ? "Running" : "Stopped", 
-                    "Status"
-                  ]}
-                  labelFormatter={(label) => `Time: ${label}`}
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-2 border shadow-sm">
-                          <p className="text-sm">{`Time: ${data.timestamp}`}</p>
-                          <p className="text-sm font-medium">{`Status: ${data.status === 1 ? "Running" : "Stopped"}`}</p>
-                          {data.status === 0 && data.reason && (
-                            <p className="text-sm">{`Reason: ${data.reason.replace(/\b\w/g, (char) => char.toUpperCase())}`}</p>
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
+                <Tooltip
+                    formatter={(value, name, props) => [
+                      value === 1 ? "Running" : "Stopped",
+                      "Status"
+                    ]}
+                    labelFormatter={(label) => `Time: ${label}`}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                            <div className="bg-white p-2 border shadow-sm">
+                              <p className="text-sm">{`Time: ${data.timestamp}`}</p>
+                              <p className="text-sm font-medium">{`Status: ${data.status === 1 ? "Running" : "Stopped"}`}</p>
+                              {data.status === 0 && data.reason && (
+                                  <p className="text-sm">{`Reason: ${data.reason.replace(/\b\w/g, (char) => char.toUpperCase())}`}</p>
+                              )}
+                            </div>
+                        );
+                      }
+                      return null;
+                    }}
                 />
                 <Bar dataKey="status" fill="#4299e1">
                   {timelineData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.status === 1 ? "#22c55e" : "#ef4444"} />
+                      <Cell key={`cell-${index}`} fill={entry.status === 1 ? "#22c55e" : "#ef4444"} />
                   ))}
                 </Bar>
               </BarChart>

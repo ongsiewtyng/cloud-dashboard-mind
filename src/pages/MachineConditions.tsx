@@ -46,27 +46,52 @@ const MachineConditions = () => {
   };
 
   const addSignalLog = (machineId: string, status: "0" | "1", autoReason?: string) => {
-    // For automatic logging, use provided reason or generate one for downtime
-    let reason = status === "1" ? "Start" : newLogReason;
-    
-    // If auto reason is provided (from simulation), use it
+    let reason = status === "1" ? "" : newLogReason;
+
     if (autoReason && status === "0") {
       reason = autoReason;
     }
-    
+
     const newLog = {
       id: Date.now().toString(),
       machineId,
       status,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: new Date().toLocaleTimeString("en-US", {
+        hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit"
+      }),
       reason,
     };
 
+    // Check for duplication or conflicting logs at the same timestamp
+    if (signalLogs.length > 0) {
+      const lastLog = signalLogs[0];
+
+      const lastLogTime = new Date(`1970-01-01T${lastLog.timestamp}Z`).getTime();
+      const newLogTime = new Date(`1970-01-01T${newLog.timestamp}Z`).getTime();
+
+      if (
+          lastLog.machineId === newLog.machineId &&
+          Math.abs(newLogTime - lastLogTime) < 1000 // Within 1 sec
+      ) {
+        if (
+            lastLog.status === newLog.status &&
+            lastLog.reason === newLog.reason
+        ) {
+          console.log("Duplicate log detected, not adding to signalLogs");
+          return;
+        }
+
+        if (lastLog.status !== newLog.status) {
+          console.log("Conflicting log detected at same timestamp, not adding");
+          return;
+        }
+      }
+    }
+
     setSignalLogs([newLog, ...signalLogs]);
     setNewLogReason("");
-    setLastStatus(status); // Update last status
-    
-    // Only show toast for manual logs, not auto-generated ones
+    setLastStatus(status);
+
     if (!autoReason) {
       toast.success(`Machine status ${status === "1" ? "running" : "downtime"} recorded successfully`);
     }
