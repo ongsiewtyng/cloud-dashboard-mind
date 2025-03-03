@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 
 interface SignalLog {
   id: string;
@@ -138,6 +138,11 @@ export function SignalHistory({
                 Record Running Status
               </Button>
             )}
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm bg-slate-100 dark:bg-slate-800 p-2 rounded">
+            <AlertCircle className="h-4 w-4 text-blue-500" />
+            <span>Automatic simulation is active. The system is generating both running and downtime records.</span>
           </div>
         </div>
 

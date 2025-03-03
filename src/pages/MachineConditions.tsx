@@ -45,21 +45,31 @@ const MachineConditions = () => {
     setSelectedMachine(null);
   };
 
-  const addSignalLog = (machineId: string, status: "0" | "1") => {
-    if (!newLogReason && status === "0") return;
+  const addSignalLog = (machineId: string, status: "0" | "1", autoReason?: string) => {
+    // For automatic logging, use provided reason or generate one for downtime
+    let reason = status === "1" ? "Start" : newLogReason;
+    
+    // If auto reason is provided (from simulation), use it
+    if (autoReason && status === "0") {
+      reason = autoReason;
+    }
     
     const newLog = {
       id: Date.now().toString(),
       machineId,
       status,
       timestamp: new Date().toLocaleTimeString(),
-      reason: status === "1" ? "Start" : newLogReason,
+      reason,
     };
 
     setSignalLogs([newLog, ...signalLogs]);
     setNewLogReason("");
     setLastStatus(status); // Update last status
-    toast.success(`Machine status ${status === "1" ? "running" : "downtime"} recorded successfully`);
+    
+    // Only show toast for manual logs, not auto-generated ones
+    if (!autoReason) {
+      toast.success(`Machine status ${status === "1" ? "running" : "downtime"} recorded successfully`);
+    }
   };
 
   const updateLogReason = (logId: string, newReason: string) => {
@@ -84,12 +94,14 @@ const MachineConditions = () => {
       // Initial random status - start with "running" most of the time for better UX
       const initialStatus = Math.random() > 0.2 ? "1" : "0";
       
+      // If initial status is downtime, generate random reason
       if (initialStatus === "0") {
         const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
-        setNewLogReason(reasons[Math.floor(Math.random() * reasons.length)]);
+        const randomReason = reasons[Math.floor(Math.random() * reasons.length)];
+        addSignalLog(selectedMachine, initialStatus, randomReason);
+      } else {
+        addSignalLog(selectedMachine, initialStatus);
       }
-      
-      addSignalLog(selectedMachine, initialStatus as "0" | "1");
       
       simulationInterval = window.setInterval(() => {
         // For more balanced on/off simulation, use the lastStatus to determine next status
@@ -105,15 +117,14 @@ const MachineConditions = () => {
           randomStatus = Math.random() < 0.6 ? "1" : "0";
         }
         
-        // If status is 0 (downtime), select a random reason
+        // Generate random reason for downtime
         if (randomStatus === "0") {
           const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
           const randomReason = reasons[Math.floor(Math.random() * reasons.length)];
-          setNewLogReason(randomReason);
+          addSignalLog(selectedMachine, randomStatus, randomReason);
+        } else {
+          addSignalLog(selectedMachine, randomStatus);
         }
-        
-        // Add the log
-        addSignalLog(selectedMachine, randomStatus);
       }, Math.floor(Math.random() * 5000) + 5000); // Random interval between 5-10 seconds
     }
     
@@ -126,7 +137,9 @@ const MachineConditions = () => {
   }, [isSimulating, selectedMachine, lastStatus]); // Add lastStatus as dependency
 
   const selectedMachineData = machines.find(m => m.id === selectedMachine);
-  const currentStatus = selectedMachineData?.latestData?.signalON as "0" | "1" || "0";
+  const currentStatus = signalLogs.length > 0 && signalLogs[0].machineId === selectedMachine 
+    ? signalLogs[0].status 
+    : "1"; // Default to running if no logs yet
 
   return (
     <div className="container mx-auto p-6 flex h-[calc(100vh-4rem)]">
