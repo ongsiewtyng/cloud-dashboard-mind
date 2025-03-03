@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 
 interface SignalLog {
   id: string;
@@ -156,11 +156,11 @@ export function SignalHistory({
                     return null;
                   }}
                 />
-                <Bar 
-                  dataKey="status" 
-                  fill={(data) => data.status === 1 ? "#22c55e" : "#ef4444"} 
-                  barSize={20}
-                />
+                <Bar dataKey="status" fill="#4299e1">
+                  {timelineData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.status === 1 ? "#22c55e" : "#ef4444"} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
