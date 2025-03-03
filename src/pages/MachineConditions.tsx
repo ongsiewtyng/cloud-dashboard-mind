@@ -6,6 +6,7 @@ import { MachineDetails } from "@/components/MachineDetails";
 import { SignalHistory } from "@/components/SignalHistory";
 import { MachineSelectPlaceholder } from "@/components/MachineSelectPlaceholder";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 const MachineConditions = () => {
   const { machines, deleteMachine } = useMachineStore();
@@ -18,6 +19,7 @@ const MachineConditions = () => {
     reason: string;
   }>>([]);
   const [newLogReason, setNewLogReason] = useState("");
+  const [isSimulating, setIsSimulating] = useState(false);
 
   // Debugging
   useEffect(() => {
@@ -62,6 +64,38 @@ const MachineConditions = () => {
     toast.success("Downtime reason updated successfully");
   };
 
+  // Simulation logic
+  useEffect(() => {
+    let simulationInterval: number | null = null;
+    
+    if (isSimulating && selectedMachine) {
+      // Initial random status
+      const initialStatus = Math.random() > 0.5 ? "1" : "0";
+      addSignalLog(selectedMachine, initialStatus as "0" | "1");
+      
+      simulationInterval = window.setInterval(() => {
+        // Random status change every 5-15 seconds
+        const randomStatus = Math.random() > 0.5 ? "1" : "0";
+        
+        // If status is 0 (downtime), select a random reason
+        if (randomStatus === "0") {
+          const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
+          const randomReason = reasons[Math.floor(Math.random() * reasons.length)];
+          setNewLogReason(randomReason);
+        }
+        
+        // Add the log
+        addSignalLog(selectedMachine, randomStatus as "0" | "1");
+      }, Math.floor(Math.random() * 10000) + 5000); // Random interval between 5-15 seconds
+    }
+    
+    return () => {
+      if (simulationInterval) {
+        clearInterval(simulationInterval);
+      }
+    };
+  }, [isSimulating, selectedMachine]);
+
   const selectedMachineData = machines.find(m => m.id === selectedMachine);
   const currentStatus = selectedMachineData?.latestData?.signalON as "0" | "1" || "0";
 
@@ -76,10 +110,18 @@ const MachineConditions = () => {
       <div className="flex-1">
         {selectedMachine ? (
           <div className="space-y-6">
-            <MachineDetails 
-              machineData={selectedMachineData} 
-              onClose={handleClosePanel} 
-            />
+            <div className="flex justify-between items-center">
+              <MachineDetails 
+                machineData={selectedMachineData} 
+                onClose={handleClosePanel} 
+              />
+              <Button 
+                onClick={() => setIsSimulating(!isSimulating)}
+                className={isSimulating ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
+              >
+                {isSimulating ? "Stop Simulation" : "Start Simulation"}
+              </Button>
+            </div>
             
             <SignalHistory 
               machineId={selectedMachine}
