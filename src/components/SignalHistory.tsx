@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface SignalLog {
   id: string;
@@ -35,6 +36,30 @@ export function SignalHistory({
   const filteredLogs = signalLogs.filter(log => log.machineId === machineId);
   const [selectedLog, setSelectedLog] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const rowsPerPage = 5;
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(filteredLogs.length / rowsPerPage);
+  
+  // Get current page logs
+  const currentLogs = filteredLogs.slice(
+    currentPage * rowsPerPage, 
+    (currentPage + 1) * rowsPerPage
+  );
+  
+  // Pagination controls
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+  
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   // Prepare data for the timeline chart
   const timelineData = filteredLogs.map(log => ({
@@ -176,7 +201,7 @@ export function SignalHistory({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredLogs.map(log => (
+            {currentLogs.map(log => (
               <TableRow key={log.id}>
                 <TableCell className={log.status === "1" ? "text-green-600" : "text-red-600"}>
                   {log.status === "1" ? "Running" : "Stopped"}
@@ -225,6 +250,38 @@ export function SignalHistory({
             )}
           </TableBody>
         </Table>
+        
+        {/* Pagination */}
+        {filteredLogs.length > rowsPerPage && (
+          <div className="flex items-center justify-between space-x-2 py-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {currentPage * rowsPerPage + 1} to {Math.min((currentPage + 1) * rowsPerPage, filteredLogs.length)} of {filteredLogs.length} entries
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevPage}
+                disabled={currentPage === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="sr-only">Previous Page</span>
+              </Button>
+              <div className="text-sm">
+                Page {currentPage + 1} of {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+                <span className="sr-only">Next Page</span>
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

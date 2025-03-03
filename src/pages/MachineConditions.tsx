@@ -19,6 +19,7 @@ const MachineConditions = () => {
   }>>([]);
   const [newLogReason, setNewLogReason] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
+  const [lastStatus, setLastStatus] = useState<"0" | "1">("1"); // Track last status to ensure alternating
 
   // Debugging
   useEffect(() => {
@@ -57,6 +58,7 @@ const MachineConditions = () => {
 
     setSignalLogs([newLog, ...signalLogs]);
     setNewLogReason("");
+    setLastStatus(status); // Update last status
     toast.success(`Machine status ${status === "1" ? "running" : "downtime"} recorded successfully`);
   };
 
@@ -90,9 +92,18 @@ const MachineConditions = () => {
       addSignalLog(selectedMachine, initialStatus as "0" | "1");
       
       simulationInterval = window.setInterval(() => {
-        // Random status change every 5-15 seconds
-        // Make it 70% likely to be running for a more realistic simulation
-        const randomStatus = Math.random() > 0.3 ? "1" : "0";
+        // For more balanced on/off simulation, use the lastStatus to determine next status
+        // If last was running (1), 40% chance of stopping (0)
+        // If last was stopped (0), 60% chance of starting (1)
+        let randomStatus: "0" | "1";
+        
+        if (lastStatus === "1") {
+          // If was running, 40% chance to stop
+          randomStatus = Math.random() < 0.4 ? "0" : "1";
+        } else {
+          // If was stopped, 60% chance to start
+          randomStatus = Math.random() < 0.6 ? "1" : "0";
+        }
         
         // If status is 0 (downtime), select a random reason
         if (randomStatus === "0") {
@@ -102,7 +113,7 @@ const MachineConditions = () => {
         }
         
         // Add the log
-        addSignalLog(selectedMachine, randomStatus as "0" | "1");
+        addSignalLog(selectedMachine, randomStatus);
       }, Math.floor(Math.random() * 5000) + 5000); // Random interval between 5-10 seconds
     }
     
@@ -112,7 +123,7 @@ const MachineConditions = () => {
         clearInterval(simulationInterval);
       }
     };
-  }, [isSimulating, selectedMachine]);
+  }, [isSimulating, selectedMachine, lastStatus]); // Add lastStatus as dependency
 
   const selectedMachineData = machines.find(m => m.id === selectedMachine);
   const currentStatus = selectedMachineData?.latestData?.signalON as "0" | "1" || "0";
@@ -134,7 +145,7 @@ const MachineConditions = () => {
             />
             
             <div className="text-sm text-muted-foreground bg-muted rounded-lg p-3 mb-2">
-              <span className="font-medium">Automatic Simulation Active:</span> Machine status is being simulated in real-time. Data updates every 5-10 seconds.
+              <span className="font-medium">Automatic Simulation Active:</span> Machine status is being simulated in real-time with both running and stopped states. Data updates every 5-10 seconds.
             </div>
             
             <SignalHistory 
