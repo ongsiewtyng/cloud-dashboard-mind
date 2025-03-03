@@ -5,6 +5,7 @@ import { MachineSidebar } from "@/components/MachineSidebar";
 import { MachineDetails } from "@/components/MachineDetails";
 import { SignalHistory } from "@/components/SignalHistory";
 import { MachineSelectPlaceholder } from "@/components/MachineSelectPlaceholder";
+import { toast } from "sonner";
 
 const MachineConditions = () => {
   const { machines, deleteMachine } = useMachineStore();
@@ -46,6 +47,19 @@ const MachineConditions = () => {
 
     setSignalLogs([newLog, ...signalLogs]);
     setNewLogReason("");
+    toast.success(`Machine status ${status === "1" ? "running" : "downtime"} recorded successfully`);
+  };
+
+  const updateLogReason = (logId: string, newReason: string) => {
+    const updatedLogs = signalLogs.map(log => {
+      if (log.id === logId) {
+        return { ...log, reason: newReason };
+      }
+      return log;
+    });
+    
+    setSignalLogs(updatedLogs);
+    toast.success("Downtime reason updated successfully");
   };
 
   const selectedMachineData = machines.find(m => m.id === selectedMachine);
