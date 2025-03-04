@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@/components/ui/table";
@@ -57,13 +58,44 @@ export function SignalHistory({
     }
   };
 
-  const timelineData = filteredLogs.map((log, index) => ({
-    index,
-    status: log.status === "1" ? 1 : 0,
-    id: log.id,
-    timestamp: log.timestamp,
-    reason: log.reason
-  })).reverse();
+  // Convert time string to minutes since start of day for position calculation
+  const timeToMinutes = (timeStr: string) => {
+    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  // Define workday time range
+  const startTime = "08:00";
+  const endTime = "17:00";
+  
+  // Calculate total minutes in the time range
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+  const totalMinutes = endMinutes - startMinutes;
+
+  // Prepare timeline data with normalized positions
+  const prepareTimelineData = () => {
+    // Sort logs by timestamp
+    const sortedLogs = [...filteredLogs].sort((a, b) => {
+      return timeToMinutes(a.timestamp) - timeToMinutes(b.timestamp);
+    });
+
+    return sortedLogs.map((log, index) => {
+      // Calculate x-position based on time (as a percentage of the total range)
+      const logMinutes = timeToMinutes(log.timestamp);
+      const normalizedPosition = Math.max(0, Math.min(1, (logMinutes - startMinutes) / totalMinutes));
+
+      return {
+        id: log.id,
+        status: log.status === "1" ? 1 : 0,
+        position: normalizedPosition * 100, // As percentage
+        timestamp: log.timestamp,
+        reason: log.reason
+      };
+    });
+  };
+
+  const timelineData = prepareTimelineData();
 
   const handleEditReason = (logId: string, currentReason: string) => {
     setSelectedLog(logId);
@@ -86,42 +118,60 @@ export function SignalHistory({
     console.log("Updated logs:", updatedLogs);
   };
 
+  // Custom bar component for the timeline
   const CustomBar = (props: any) => {
-    const { x, y, width, height, value } = props;
+    const { x, y, width, height, value, payload } = props;
     const barWidth = 4;
-    const color = value === 1 ? "#22c55e" : "#ef4444";
+    const color = value === 1 ? "#22c55e" : "#ef4444"; // Green for running, Red for stopped
     
-    const xPos = x + (width - barWidth) / 2;
+    // Calculate position based on timestamp
+    const xPos = payload.position / 100 * width;
     
     return (
       <>
         <Rectangle
-          x={xPos - 1}
-          y={y - 1}
-          width={barWidth + 2}
-          height={height + 2}
-          fill="white"
-          stroke="#cbd5e1"
-          strokeWidth={1}
-        />
-        <Rectangle
-          x={xPos}
+          x={xPos - barWidth/2}
           y={y}
           width={barWidth}
           height={height}
           fill={color}
+          stroke="#ffffff"
+          strokeWidth={1}
         />
       </>
     );
   };
 
-  const getTimeRange = () => {
-    const start = "8:00";
-    const end = "17:00";
-    return { start, end };
+  // Custom chart component with fixed axis
+  const TimelineChart = () => {
+    return (
+      <div className="relative h-16 w-full bg-white border border-slate-200 rounded">
+        {/* Time labels */}
+        <div className="absolute top-0 left-0 right-0 flex justify-between text-xs text-slate-600 px-2">
+          <span>{startTime}</span>
+          <span>{endTime}</span>
+        </div>
+        
+        {/* Chart background */}
+        <div className="absolute top-5 left-0 right-0 bottom-0">
+          {/* Signal bars */}
+          {timelineData.map((data, index) => (
+            <div 
+              key={data.id}
+              className="absolute top-0 bottom-0" 
+              style={{ 
+                left: `${data.position}%`,
+                width: '4px',
+                marginLeft: '-2px', // Center the bar
+                backgroundColor: data.status === 1 ? '#22c55e' : '#ef4444',
+                border: '1px solid #ffffff',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
   };
-
-  const { start, end } = getTimeRange();
 
   return (
     <Card>
@@ -176,26 +226,7 @@ export function SignalHistory({
 
         <div className="mb-6 bg-slate-100 p-4 rounded-lg">
           <h3 className="text-sm font-medium mb-2">Machine Status Timeline</h3>
-          <div className="flex justify-between mb-1 text-xs text-slate-600">
-            <span>{start}</span>
-            <span>{end}</span>
-          </div>
-          <div className="h-16 w-full border border-slate-200 rounded bg-white p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={timelineData}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                barSize={4}
-              >
-                <Bar 
-                  dataKey="status" 
-                  fill="#000" 
-                  shape={<CustomBar />}
-                  isAnimationActive={false}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <TimelineChart />
         </div>
 
         <Table>

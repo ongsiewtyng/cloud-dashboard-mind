@@ -52,13 +52,18 @@ const MachineConditions = () => {
       reason = autoReason;
     }
 
+    // Format timestamp in HH:MM:SS format
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const timestamp = `${hours}:${minutes}:${seconds}`;
+
     const newLog = {
       id: Date.now().toString(),
       machineId,
       status,
-      timestamp: new Date().toLocaleTimeString("en-US", {
-        hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit"
-      }),
+      timestamp,
       reason,
     };
 
@@ -97,18 +102,6 @@ const MachineConditions = () => {
     }
   };
 
-  const updateLogReason = (logId: string, newReason: string) => {
-    const updatedLogs = signalLogs.map(log => {
-      if (log.id === logId) {
-        return { ...log, reason: newReason };
-      }
-      return log;
-    });
-    
-    setSignalLogs(updatedLogs);
-    toast.success("Downtime reason updated successfully");
-  };
-
   // Simulation logic
   useEffect(() => {
     let simulationInterval: number | null = null;
@@ -126,6 +119,44 @@ const MachineConditions = () => {
         addSignalLog(selectedMachine, initialStatus, randomReason);
       } else {
         addSignalLog(selectedMachine, initialStatus);
+      }
+      
+      // Distribute logs across the workday timeline for more realistic visualization
+      const generateRandomTime = () => {
+        // Generate time between 8:00 and 17:00
+        const hour = Math.floor(Math.random() * 9) + 8; // 8-17
+        const minute = Math.floor(Math.random() * 60);
+        const second = Math.floor(Math.random() * 60);
+        return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
+      };
+      
+      // Generate some historical data for better timeline visualization
+      const generateHistoricalData = () => {
+        const statuses: ("0" | "1")[] = ["0", "1"];
+        const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
+        
+        // Generate 5-10 historical records
+        const numRecords = Math.floor(Math.random() * 6) + 5;
+        
+        for (let i = 0; i < numRecords; i++) {
+          const status = statuses[Math.floor(Math.random() * statuses.length)];
+          const reason = status === "0" ? reasons[Math.floor(Math.random() * reasons.length)] : "";
+          
+          const historicalLog = {
+            id: `hist-${Date.now()}-${i}`,
+            machineId: selectedMachine,
+            status,
+            timestamp: generateRandomTime(),
+            reason,
+          };
+          
+          setSignalLogs(prev => [historicalLog, ...prev]);
+        }
+      };
+      
+      // Generate historical data once on initial load
+      if (signalLogs.filter(log => log.machineId === selectedMachine).length === 0) {
+        generateHistoricalData();
       }
       
       simulationInterval = window.setInterval(() => {
