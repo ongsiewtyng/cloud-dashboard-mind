@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@/components/ui/table";
@@ -39,16 +38,13 @@ export function SignalHistory({
   const [currentPage, setCurrentPage] = useState(0);
   const rowsPerPage = 5;
   
-  // Calculate total pages
   const totalPages = Math.ceil(filteredLogs.length / rowsPerPage);
   
-  // Get current page logs
   const currentLogs = filteredLogs.slice(
     currentPage * rowsPerPage, 
     (currentPage + 1) * rowsPerPage
   );
   
-  // Pagination controls
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
@@ -61,15 +57,13 @@ export function SignalHistory({
     }
   };
 
-  // Prepare data for the timeline chart
-  // We'll now change to a vertical bar chart format, similar to the image
   const timelineData = filteredLogs.map((log, index) => ({
     index,
     status: log.status === "1" ? 1 : 0,
     id: log.id,
     timestamp: log.timestamp,
     reason: log.reason
-  }));
+  })).reverse();
 
   const handleEditReason = (logId: string, currentReason: string) => {
     setSelectedLog(logId);
@@ -79,7 +73,6 @@ export function SignalHistory({
   const saveReason = () => {
     if (!selectedLog) return;
     
-    // Find the log in the signalLogs array
     const updatedLogs = signalLogs.map(log => {
       if (log.id === selectedLog) {
         return { ...log, reason: editReason };
@@ -87,35 +80,48 @@ export function SignalHistory({
       return log;
     });
     
-    // Update the signalLogs state
-    // Note: This requires updating the parent component's state, which would need to be passed as props
-    // For now, we're just closing the edit mode
     setSelectedLog(null);
     setEditReason("");
     
-    // In a real implementation, you would call a function passed as props to update the logs
     console.log("Updated logs:", updatedLogs);
   };
 
-  // Custom bar shape to create thin vertical bars
   const CustomBar = (props: any) => {
     const { x, y, width, height, value } = props;
-    const barWidth = 4; // Make the bars thinner
-    const color = value === 1 ? "#22c55e" : "#ef4444"; // Green for running, Red for stopped
+    const barWidth = 4;
+    const color = value === 1 ? "#22c55e" : "#ef4444";
     
-    // Center the bar in its assigned space
     const xPos = x + (width - barWidth) / 2;
     
     return (
-      <Rectangle
-        x={xPos}
-        y={y}
-        width={barWidth}
-        height={height}
-        fill={color}
-      />
+      <>
+        <Rectangle
+          x={xPos - 1}
+          y={y - 1}
+          width={barWidth + 2}
+          height={height + 2}
+          fill="white"
+          stroke="#cbd5e1"
+          strokeWidth={1}
+        />
+        <Rectangle
+          x={xPos}
+          y={y}
+          width={barWidth}
+          height={height}
+          fill={color}
+        />
+      </>
     );
   };
+
+  const getTimeRange = () => {
+    const start = "8:00";
+    const end = "17:00";
+    return { start, end };
+  };
+
+  const { start, end } = getTimeRange();
 
   return (
     <Card>
@@ -168,14 +174,13 @@ export function SignalHistory({
           </div>
         </div>
 
-        {/* Timeline Chart - Updated to match the requested style */}
-        <div className="mb-6 bg-gray-200 p-4 rounded-lg">
+        <div className="mb-6 bg-slate-100 p-4 rounded-lg">
           <h3 className="text-sm font-medium mb-2">Machine Status Timeline</h3>
-          <div className="flex justify-between mb-1 text-xs">
-            <span>Time</span>
-            <span>Time</span>
+          <div className="flex justify-between mb-1 text-xs text-slate-600">
+            <span>{start}</span>
+            <span>{end}</span>
           </div>
-          <div className="h-16 w-full">
+          <div className="h-16 w-full border border-slate-200 rounded bg-white p-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={timelineData}
@@ -253,7 +258,6 @@ export function SignalHistory({
           </TableBody>
         </Table>
         
-        {/* Pagination */}
         {filteredLogs.length > rowsPerPage && (
           <div className="flex items-center justify-between space-x-2 py-4">
             <div className="text-sm text-muted-foreground">
