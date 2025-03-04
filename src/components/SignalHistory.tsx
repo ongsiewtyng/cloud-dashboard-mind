@@ -73,9 +73,13 @@ export function SignalHistory({
   const timelineData = prepareTimelineData();
 
   const handleAddLog = (status: "0" | "1") => {
-    const added = onAddLog(machineId, status);
-    if (added) {
-      toast.success(`Machine status ${status === "1" ? "running" : "downtime"} recorded successfully`);
+    onAddLog(machineId, status);
+    
+    // Show success toast after calling onAddLog
+    if (status === "1") {
+      toast.success("Machine running status recorded successfully");
+    } else {
+      toast.success("Machine downtime recorded successfully");
     }
   };
 
