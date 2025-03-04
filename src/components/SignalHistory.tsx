@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, Rectangle } from "recharts";
 import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 
 interface SignalLog {
@@ -62,12 +62,14 @@ export function SignalHistory({
   };
 
   // Prepare data for the timeline chart
-  const timelineData = filteredLogs.map(log => ({
-    timestamp: log.timestamp,
+  // We'll now change to a vertical bar chart format, similar to the image
+  const timelineData = filteredLogs.map((log, index) => ({
+    index,
     status: log.status === "1" ? 1 : 0,
     id: log.id,
+    timestamp: log.timestamp,
     reason: log.reason
-  })).reverse();
+  }));
 
   const handleEditReason = (logId: string, currentReason: string) => {
     setSelectedLog(logId);
@@ -93,6 +95,26 @@ export function SignalHistory({
     
     // In a real implementation, you would call a function passed as props to update the logs
     console.log("Updated logs:", updatedLogs);
+  };
+
+  // Custom bar shape to create thin vertical bars
+  const CustomBar = (props: any) => {
+    const { x, y, width, height, value } = props;
+    const barWidth = 4; // Make the bars thinner
+    const color = value === 1 ? "#22c55e" : "#ef4444"; // Green for running, Red for stopped
+    
+    // Center the bar in its assigned space
+    const xPos = x + (width - barWidth) / 2;
+    
+    return (
+      <Rectangle
+        x={xPos}
+        y={y}
+        width={barWidth}
+        height={height}
+        fill={color}
+      />
+    );
   };
 
   return (
@@ -146,51 +168,26 @@ export function SignalHistory({
           </div>
         </div>
 
-        {/* Timeline Chart */}
-        <div className="mb-6">
+        {/* Timeline Chart - Updated to match the requested style */}
+        <div className="mb-6 bg-gray-200 p-4 rounded-lg">
           <h3 className="text-sm font-medium mb-2">Machine Status Timeline</h3>
-          <div className="h-64 w-full">
+          <div className="flex justify-between mb-1 text-xs">
+            <span>Time</span>
+            <span>Time</span>
+          </div>
+          <div className="h-16 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                  data={timelineData}
-                  layout="vertical"
-                  margin={{ top: 20, right: 30, left: 70, bottom: 5 }}
+                data={timelineData}
+                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                barSize={4}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 1]} ticks={[0, 1]} tickFormatter={(value) => value === 1 ? "On" : "Off"} />
-                <YAxis
-                    dataKey="timestamp"
-                    type="category"
-                    width={60}
-                    tick={{ fontSize: 12 }}
+                <Bar 
+                  dataKey="status" 
+                  fill="#000" 
+                  shape={<CustomBar />}
+                  isAnimationActive={false}
                 />
-                <Tooltip
-                    formatter={(value, name, props) => [
-                      value === 1 ? "Running" : "Stopped",
-                      "Status"
-                    ]}
-                    labelFormatter={(label) => `Time: ${label}`}
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                            <div className="bg-white p-2 border shadow-sm">
-                              <p className="text-sm">{`Time: ${data.timestamp}`}</p>
-                              <p className="text-sm font-medium">{`Status: ${data.status === 1 ? "Running" : "Stopped"}`}</p>
-                              {data.status === 0 && data.reason && (
-                                  <p className="text-sm">{`Reason: ${data.reason.replace(/\b\w/g, (char) => char.toUpperCase())}`}</p>
-                              )}
-                            </div>
-                        );
-                      }
-                      return null;
-                    }}
-                />
-                <Bar dataKey="status" fill="#4299e1">
-                  {timelineData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.status === 1 ? "#22c55e" : "#ef4444"} />
-                  ))}
-                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
