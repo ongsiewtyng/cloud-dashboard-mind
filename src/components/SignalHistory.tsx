@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { LogReasonSelector } from "./signal/LogReasonSelector";
 import { TimelineChart } from "./signal/TimelineChart";
 import { LogsTable } from "./signal/LogsTable";
+import { ActivitySquare } from "lucide-react";
 
 interface SignalLog {
   id: string;
@@ -84,11 +85,14 @@ export function SignalHistory({
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Signal History</CardTitle>
+    <Card className="shadow-md border-slate-200">
+      <CardHeader className="pb-2 border-b bg-slate-50">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <ActivitySquare className="h-5 w-5 text-indigo-500" />
+          <span>Signal History</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 space-y-4">
         <LogReasonSelector 
           currentStatus={currentStatus}
           newLogReason={newLogReason}
