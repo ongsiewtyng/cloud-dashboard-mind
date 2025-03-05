@@ -1,19 +1,6 @@
-
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
-import { 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
-} from "@/components/ui/tooltip";
-import { 
-  ZoomIn, 
-  ZoomOut, 
-  Maximize2, 
-  Clock,
-  Info
-} from "lucide-react";
+import { Clock } from "lucide-react";
+import { TimelineControls } from "./TimelineControls";
 
 interface TimelineChartProps {
   timelineData: Array<{
@@ -29,55 +16,52 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
   const startTime = "08:00";
   const endTime = "17:00";
   
-  const [zoomLevel, setZoomLevel] = useState(1.5); // Start with a bit of zoom
+  const [zoomLevel, setZoomLevel] = useState(1.5);
   const [panOffset, setPanOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(0);
-  const [selectedSignal, setSelectedSignal] = useState<string | null>(null);
   const [selectedSignalDetails, setSelectedSignalDetails] = useState<{
     id: string;
     status: number;
     timestamp: string;
     reason: string;
   } | null>(null);
+  const [currentTimePosition, setCurrentTimePosition] = useState(0);
   
   const timelineRef = useRef<HTMLDivElement>(null);
   
-  // Get current time in HH:MM format
-  const getCurrentTimePosition = () => {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const currentTime = `${hours}:${minutes}`;
-    
-    // Convert to minutes since start of day for position calculation
-    const timeToMinutes = (timeStr: string) => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      return hours * 60 + minutes;
+  // Update current time position every second
+  useEffect(() => {
+    const updateCurrentTime = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const timeToMinutes = (timeStr: string) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+      };
+      
+      const startMinutes = timeToMinutes(startTime);
+      const endMinutes = timeToMinutes(endTime);
+      const currentMinutes = hours * 60 + minutes;
+      const totalMinutes = endMinutes - startMinutes;
+      
+      const position = Math.max(0, Math.min(1, (currentMinutes - startMinutes) / totalMinutes));
+      setCurrentTimePosition(position);
+      
+      // Auto-pan to follow current time if not dragging
+      if (!isDragging && timelineRef.current) {
+        const newOffset = (position * timelineRef.current.scrollWidth * zoomLevel) - 
+                         (timelineRef.current.clientWidth / 2);
+        setPanOffset(Math.max(0, Math.min(newOffset, 
+          (timelineRef.current.scrollWidth * zoomLevel) - timelineRef.current.clientWidth)));
+      }
     };
     
-    // Calculate position as percentage of total workday
-    const startMinutes = timeToMinutes(startTime);
-    const endMinutes = timeToMinutes(endTime);
-    const currentMinutes = timeToMinutes(currentTime);
-    const totalMinutes = endMinutes - startMinutes;
-    
-    // Calculate normalized position (0-1)
-    return Math.max(0, Math.min(1, (currentMinutes - startMinutes) / totalMinutes));
-  };
-  
-  // Initialize pan offset to center on current time
-  useEffect(() => {
-    if (timelineRef.current) {
-      const currentTimePosition = getCurrentTimePosition();
-      const initialOffset = (currentTimePosition * timelineRef.current.scrollWidth * zoomLevel) - 
-                            (timelineRef.current.clientWidth / 2);
-      
-      // Ensure offset is within bounds
-      const maxPan = (timelineRef.current.scrollWidth * zoomLevel) - timelineRef.current.clientWidth;
-      setPanOffset(Math.max(0, Math.min(initialOffset, maxPan)));
-    }
-  }, [zoomLevel]);
+    updateCurrentTime(); // Initial update
+    const interval = setInterval(updateCurrentTime, 1000);
+    return () => clearInterval(interval);
+  }, [zoomLevel, isDragging]);
   
   const handleZoomIn = () => {
     setZoomLevel(Math.min(zoomLevel + 0.5, 5));
@@ -134,23 +118,34 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
   const handleMouseLeave = () => {
     setIsDragging(false);
   };
-
-  const handleSignalClick = (signalId: string) => {
-    setSelectedSignal(signalId === selectedSignal ? null : signalId);
+  
+  const getCurrentTimePosition = () => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const currentTime = `${hours}:${minutes}`;
     
-    // Set selected signal details for info panel
-    const signalData = timelineData.find(data => data.id === signalId);
-    if (signalData) {
-      setSelectedSignalDetails(signalData);
-    } else {
-      setSelectedSignalDetails(null);
-    }
+    // Convert to minutes since start of day for position calculation
+    const timeToMinutes = (timeStr: string) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    
+    // Calculate position as percentage of total workday
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    const currentMinutes = timeToMinutes(currentTime);
+    const totalMinutes = endMinutes - startMinutes;
+    
+    // Calculate normalized position (0-1)
+    return Math.max(0, Math.min(1, (currentMinutes - startMinutes) / totalMinutes));
   };
-
-  const getStatusLabel = (status: number) => status === 1 ? "Running" : "Stopped";
+  
+  const handleSignalClick = (signalData: typeof timelineData[0]) => {
+    setSelectedSignalDetails(signalData);
+  };
   
   const formatTimeLabel = (time: string) => {
-    // Convert 24-hour format to 12-hour format with AM/PM
     const [hours, minutes] = time.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
     const formattedHours = hours % 12 || 12;
@@ -164,64 +159,11 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
           <Clock className="h-4 w-4 text-indigo-500" />
           <span>Machine Status Timeline</span>
         </h3>
-        <div className="flex gap-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={handleZoomIn}
-                >
-                  <ZoomIn className="h-4 w-4" />
-                  <span className="sr-only">Zoom In</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Zoom In</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={handleZoomOut}
-                >
-                  <ZoomOut className="h-4 w-4" />
-                  <span className="sr-only">Zoom Out</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Zoom Out</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={handleReset}
-                >
-                  <Maximize2 className="h-4 w-4" />
-                  <span className="sr-only">Reset View</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Center on Current Time</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <TimelineControls 
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onReset={handleReset}
+        />
       </div>
       
       <div className="relative h-28 bg-white border border-slate-200 rounded-md shadow-inner overflow-hidden">
@@ -239,13 +181,13 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
         
         {/* Current time indicator */}
         <div 
-          className="absolute top-8 bottom-0 w-0.5 bg-blue-500 z-20"
+          className="absolute top-8 bottom-0 w-0.5 bg-blue-500 z-20 transition-transform duration-1000"
           style={{ 
-            left: `${getCurrentTimePosition() * 100}%`,
+            left: `${currentTimePosition * 100}%`,
             transform: `translateX(-${panOffset * (1/zoomLevel)}px)`,
           }}
         >
-          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-full" />
+          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
         </div>
         
         {/* Interactive timeline area */}
@@ -260,7 +202,7 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          {/* Scale markers (hours) */}
+          {/* Scale markers */}
           <div className="absolute top-0 left-0 right-0 h-6 pointer-events-none">
             {Array.from({ length: 10 }).map((_, i) => (
               <div 
@@ -282,9 +224,9 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
               transform: `translateX(-${panOffset}px)`,
             }}
           >
-            {/* Signal events with enhanced styling */}
+            {/* Signal events */}
             {timelineData.map((data) => {
-              const isSelected = selectedSignal === data.id;
+              const isSelected = selectedSignalDetails?.id === data.id;
               return (
                 <div 
                   key={data.id}
@@ -299,7 +241,7 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
                       ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(0,0,0,0.1)' 
                       : '0 0 0 1px rgba(255,255,255,0.7)',
                   }}
-                  onClick={() => handleSignalClick(data.id)}
+                  onClick={() => handleSignalClick(data)}
                 />
               );
             })}
@@ -323,10 +265,7 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
       {selectedSignalDetails && (
         <div className="mt-3 p-3 bg-white border border-slate-200 rounded-md shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium flex items-center gap-1.5">
-              <Info className="h-4 w-4 text-blue-500" />
-              <span>Signal Details</span>
-            </h4>
+            <h4 className="text-sm font-medium">Signal Details</h4>
             <div 
               className="h-3 w-3 rounded-full" 
               style={{ 
@@ -337,7 +276,9 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
             <div>
               <span className="text-slate-500">Status:</span>{" "}
-              <span className="font-medium">{getStatusLabel(selectedSignalDetails.status)}</span>
+              <span className="font-medium">
+                {selectedSignalDetails.status === 1 ? "Running" : "Stopped"}
+              </span>
             </div>
             <div>
               <span className="text-slate-500">Time:</span>{" "}
