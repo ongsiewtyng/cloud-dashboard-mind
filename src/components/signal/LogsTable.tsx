@@ -87,11 +87,11 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
                     <SelectContent>
                       <SelectItem value="maintenance">Maintenance</SelectItem>
                       <SelectItem value="breakdown">Breakdown</SelectItem>
-                      <SelectItem value="setup">Setup/Changeover</SelectItem>
-                      <SelectItem value="material">Material Shortage</SelectItem>
-                      <SelectItem value="operator">No Operator</SelectItem>
-                      <SelectItem value="quality">Quality Issue</SelectItem>
-                      <SelectItem value="planned">Planned Downtime</SelectItem>
+                      <SelectItem value="setup/changeover">Setup/Changeover</SelectItem>
+                      <SelectItem value="material shortage">Material Shortage</SelectItem>
+                      <SelectItem value="no operator">No Operator</SelectItem>
+                      <SelectItem value="quality issue">Quality Issue</SelectItem>
+                      <SelectItem value="planned downtime">Planned Downtime</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>

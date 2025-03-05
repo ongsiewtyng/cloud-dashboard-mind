@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Clock } from "lucide-react";
 import { TimelineControls } from "./TimelineControls";
+import * as React from "react";
 
 interface TimelineChartProps {
   timelineData: Array<{
