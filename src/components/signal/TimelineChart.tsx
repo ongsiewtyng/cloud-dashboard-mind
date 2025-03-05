@@ -286,17 +286,17 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
                 </div>
 
                 {/* Legend */}
-                <div
-                    className="absolute bottom-1 right-2 flex items-center gap-4 text-xs bg-white/80 px-2 py-0.5 rounded">
-                    <div className="flex items-center">
-                        <div className="h-2.5 w-2.5 bg-green-500 rounded-full mr-1.5"/>
-                        <span>Running</span>
-                    </div>
-                    <div className="flex items-center">
-                        <div className="h-2.5 w-2.5 bg-red-500 rounded-full mr-1.5"/>
-                        <span>Stopped</span>
-                    </div>
-                </div>
+                {/*<div*/}
+                {/*    className="absolute bottom-1 right-2 flex items-center gap-4 text-xs bg-white/80 px-2 py-0.5 rounded">*/}
+                {/*    <div className="flex items-center">*/}
+                {/*        <div className="h-2.5 w-2.5 bg-green-500 rounded-full mr-1.5"/>*/}
+                {/*        <span>Running</span>*/}
+                {/*    </div>*/}
+                {/*    <div className="flex items-center">*/}
+                {/*        <div className="h-2.5 w-2.5 bg-red-500 rounded-full mr-1.5"/>*/}
+                {/*        <span>Stopped</span>*/}
+                {/*    </div>*/}
+                {/*</div>*/}
             </div>
 
             {/* Selected signal details panel */}
