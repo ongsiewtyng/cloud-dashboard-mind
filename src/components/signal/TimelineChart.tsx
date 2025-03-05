@@ -46,36 +46,70 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
       const currentMinutes = hours * 60 + minutes;
       const totalMinutes = endMinutes - startMinutes;
       
+      // Calculate normalized position (0-1)
       const position = Math.max(0, Math.min(1, (currentMinutes - startMinutes) / totalMinutes));
       setCurrentTimePosition(position);
       
       // Auto-pan to follow current time if not dragging
       if (!isDragging && timelineRef.current) {
-        const newOffset = (position * timelineRef.current.scrollWidth * zoomLevel) - 
-                         (timelineRef.current.clientWidth / 2);
-        setPanOffset(Math.max(0, Math.min(newOffset, 
-          (timelineRef.current.scrollWidth * zoomLevel) - timelineRef.current.clientWidth)));
+        // Calculate center position for timeline
+        const newOffset = (position * 100 * zoomLevel) - 
+                          (timelineRef.current.clientWidth / 2);
+        
+        // Calculate maximum possible offset
+        const maxPan = (100 * zoomLevel) - timelineRef.current.clientWidth;
+        
+        // Set pan offset, ensuring it stays within bounds
+        setPanOffset(Math.max(0, Math.min(newOffset, maxPan)));
       }
     };
     
     updateCurrentTime(); // Initial update
     const interval = setInterval(updateCurrentTime, 1000);
     return () => clearInterval(interval);
-  }, [zoomLevel, isDragging]);
+  }, [zoomLevel, isDragging, startTime, endTime]);
   
   const handleZoomIn = () => {
-    setZoomLevel(Math.min(zoomLevel + 0.5, 5));
+    setZoomLevel(prev => {
+      // Limit max zoom to 4x to prevent bugs
+      const newZoom = Math.min(prev + 0.5, 4);
+      
+      // Adjust pan offset when zooming to keep the view centered
+      if (timelineRef.current) {
+        const centerPoint = panOffset + (timelineRef.current.clientWidth / 2);
+        const scaleFactor = newZoom / prev;
+        const newCenter = centerPoint * scaleFactor;
+        const newOffset = newCenter - (timelineRef.current.clientWidth / 2);
+        
+        // Calculate max pan to prevent overflow
+        const maxPan = (100 * newZoom) - timelineRef.current.clientWidth;
+        setPanOffset(Math.max(0, Math.min(newOffset, maxPan)));
+      }
+      
+      return newZoom;
+    });
   };
   
   const handleZoomOut = () => {
-    if (zoomLevel > 1) {
-      setZoomLevel(Math.max(zoomLevel - 0.5, 1));
-      // Adjust pan offset when zooming out to prevent overflow
+    setZoomLevel(prev => {
+      if (prev <= 1) return 1;
+      
+      const newZoom = Math.max(prev - 0.5, 1);
+      
+      // Adjust pan offset when zooming out to keep centered
       if (timelineRef.current) {
-        const maxPan = (timelineRef.current.scrollWidth * zoomLevel) - timelineRef.current.clientWidth;
-        setPanOffset(Math.max(Math.min(panOffset, maxPan), 0));
+        const centerPoint = panOffset + (timelineRef.current.clientWidth / 2);
+        const scaleFactor = newZoom / prev;
+        const newCenter = centerPoint * scaleFactor;
+        const newOffset = newCenter - (timelineRef.current.clientWidth / 2);
+        
+        // Calculate max pan to prevent overflow
+        const maxPan = (100 * newZoom) - timelineRef.current.clientWidth;
+        setPanOffset(Math.max(0, Math.min(newOffset, maxPan)));
       }
-    }
+      
+      return newZoom;
+    });
   };
   
   const handleReset = () => {
@@ -83,13 +117,13 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
     
     // Reset pan to center on current time
     if (timelineRef.current) {
-      const currentTimePosition = getCurrentTimePosition();
-      const initialOffset = (currentTimePosition * timelineRef.current.scrollWidth * 1.5) - 
-                            (timelineRef.current.clientWidth / 2);
+      // Calculate center on current time
+      const newOffset = (currentTimePosition * 100 * 1.5) - 
+                        (timelineRef.current.clientWidth / 2);
       
       // Ensure offset is within bounds
-      const maxPan = (timelineRef.current.scrollWidth * 1.5) - timelineRef.current.clientWidth;
-      setPanOffset(Math.max(0, Math.min(initialOffset, maxPan)));
+      const maxPan = (100 * 1.5) - timelineRef.current.clientWidth;
+      setPanOffset(Math.max(0, Math.min(newOffset, maxPan)));
     }
   };
   
@@ -103,7 +137,7 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging && timelineRef.current) {
       const deltaX = dragStart - e.clientX;
-      const maxPan = (timelineRef.current.scrollWidth * zoomLevel) - timelineRef.current.clientWidth;
+      const maxPan = (100 * zoomLevel) - timelineRef.current.clientWidth;
       const newPanOffset = Math.max(Math.min(panOffset + deltaX, maxPan), 0);
       
       setPanOffset(newPanOffset);
@@ -119,28 +153,6 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
     setIsDragging(false);
   };
   
-  const getCurrentTimePosition = () => {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const currentTime = `${hours}:${minutes}`;
-    
-    // Convert to minutes since start of day for position calculation
-    const timeToMinutes = (timeStr: string) => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
-    
-    // Calculate position as percentage of total workday
-    const startMinutes = timeToMinutes(startTime);
-    const endMinutes = timeToMinutes(endTime);
-    const currentMinutes = timeToMinutes(currentTime);
-    const totalMinutes = endMinutes - startMinutes;
-    
-    // Calculate normalized position (0-1)
-    return Math.max(0, Math.min(1, (currentMinutes - startMinutes) / totalMinutes));
-  };
-  
   const handleSignalClick = (signalData: typeof timelineData[0]) => {
     setSelectedSignalDetails(signalData);
   };
@@ -151,6 +163,35 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
     const formattedHours = hours % 12 || 12;
     return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
+  
+  // Generate hourly time labels
+  const generateHourlyLabels = () => {
+    const labels = [];
+    const [startHour] = startTime.split(':').map(Number);
+    const [endHour] = endTime.split(':').map(Number);
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      const timeStr = `${hour}:00`;
+      const minutes = hour * 60;
+      const [startH, startM] = startTime.split(':').map(Number);
+      const startMinutes = startH * 60 + startM;
+      const [endH, endM] = endTime.split(':').map(Number);
+      const endMinutes = endH * 60 + endM;
+      const totalMinutes = endMinutes - startMinutes;
+      const position = (minutes - startMinutes) / totalMinutes;
+      
+      if (position >= 0 && position <= 1) {
+        labels.push({
+          hour,
+          position: position * 100,
+          label: formatTimeLabel(timeStr)
+        });
+      }
+    }
+    return labels;
+  };
+  
+  const hourlyLabels = generateHourlyLabels();
   
   return (
     <div className="mb-6 bg-slate-100 p-4 rounded-lg shadow-sm">
@@ -166,7 +207,7 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
         />
       </div>
       
-      <div className="relative h-28 bg-white border border-slate-200 rounded-md shadow-inner overflow-hidden">
+      <div className="relative h-32 bg-white border border-slate-200 rounded-md shadow-inner overflow-hidden">
         {/* Time indicators */}
         <div className="absolute top-0 left-0 right-0 flex justify-between text-xs text-slate-500 px-3 py-1 bg-slate-50 border-b border-slate-200">
           <div className="flex items-center">
@@ -177,17 +218,6 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
             <Clock className="h-3 w-3 mr-1" />
             <span>{formatTimeLabel(endTime)}</span>
           </div>
-        </div>
-        
-        {/* Current time indicator */}
-        <div 
-          className="absolute top-8 bottom-0 w-0.5 bg-blue-500 z-20 transition-transform duration-1000"
-          style={{ 
-            left: `${currentTimePosition * 100}%`,
-            transform: `translateX(-${panOffset * (1/zoomLevel)}px)`,
-          }}
-        >
-          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
         </div>
         
         {/* Interactive timeline area */}
@@ -202,23 +232,28 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          {/* Scale markers */}
+          {/* Hourly time labels */}
           <div className="absolute top-0 left-0 right-0 h-6 pointer-events-none">
-            {Array.from({ length: 10 }).map((_, i) => (
+            {hourlyLabels.map((label, i) => (
               <div 
-                key={`marker-${i}`} 
-                className="absolute top-0 bottom-0 border-l border-slate-300" 
+                key={`hour-${label.hour}`} 
+                className="absolute top-0 h-full flex flex-col items-center"
                 style={{ 
-                  left: `${i * 10}%`,
+                  left: `${label.position}%`,
                   transform: `translateX(-${panOffset * (1/zoomLevel)}px)`,
                 }}
-              />
+              >
+                <div className="h-6 border-l border-slate-300 w-0"></div>
+                <span className="text-xs text-slate-500 whitespace-nowrap transform -translate-x-1/2 mt-1">
+                  {label.label}
+                </span>
+              </div>
             ))}
           </div>
           
           {/* Timeline container with zoom and pan */}
           <div 
-            className="absolute top-6 left-0 h-full transition-transform" 
+            className="absolute top-8 left-0 h-full transition-transform" 
             style={{ 
               width: `${100 * zoomLevel}%`,
               transform: `translateX(-${panOffset}px)`,
@@ -242,9 +277,21 @@ export function TimelineChart({ timelineData }: TimelineChartProps) {
                       : '0 0 0 1px rgba(255,255,255,0.7)',
                   }}
                   onClick={() => handleSignalClick(data)}
+                  title={`${data.status === 1 ? 'Running' : 'Stopped'} at ${data.timestamp}`}
                 />
               );
             })}
+          </div>
+          
+          {/* Current time indicator - FIXED to show correctly with zoom/pan */}
+          <div 
+            className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-20"
+            style={{ 
+              left: `${currentTimePosition * 100}%`,
+              transform: `translateX(-${panOffset * (1/zoomLevel)}px)`,
+            }}
+          >
+            <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
           </div>
         </div>
         

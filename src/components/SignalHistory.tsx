@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { LogReasonSelector } from "./signal/LogReasonSelector";
 import { TimelineChart } from "./signal/TimelineChart";
 import { LogsTable } from "./signal/LogsTable";
 import { ActivitySquare } from "lucide-react";
@@ -93,15 +92,7 @@ export function SignalHistory({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 space-y-4">
-        {/*<LogReasonSelector */}
-        {/*  currentStatus={currentStatus}*/}
-        {/*  newLogReason={newLogReason}*/}
-        {/*  setNewLogReason={setNewLogReason}*/}
-        {/*  onAddLog={handleAddLog}*/}
-        {/*/>*/}
-
         <TimelineChart timelineData={timelineData} />
-
         <LogsTable filteredLogs={filteredLogs} />
       </CardContent>
     </Card>
