@@ -93,12 +93,12 @@ export function SignalHistory({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 space-y-4">
-        <LogReasonSelector 
-          currentStatus={currentStatus}
-          newLogReason={newLogReason}
-          setNewLogReason={setNewLogReason}
-          onAddLog={handleAddLog}
-        />
+        {/*<LogReasonSelector */}
+        {/*  currentStatus={currentStatus}*/}
+        {/*  newLogReason={newLogReason}*/}
+        {/*  setNewLogReason={setNewLogReason}*/}
+        {/*  onAddLog={handleAddLog}*/}
+        {/*/>*/}
 
         <TimelineChart timelineData={timelineData} />
 

@@ -48,14 +48,17 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
   };
 
   const saveReason = () => {
-    if (!selectedLog) return;
-    
-    // In a real app, we would update the state here
-    // This is handled by the parent component through props in the actual implementation
-    
-    setSelectedLog(null);
-    setEditReason("");
-  };
+      if (!selectedLog) return;
+
+      // Find the log and update its reason locally
+      const logIndex = filteredLogs.findIndex(log => log.id === selectedLog);
+      if (logIndex !== -1) {
+        filteredLogs[logIndex].reason = editReason;
+      }
+
+      setSelectedLog(null);
+      setEditReason("");
+    };
   
   return (
     <>
