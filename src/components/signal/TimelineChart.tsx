@@ -1,4 +1,3 @@
-
 import {useState, useRef, useEffect} from "react";
 import {Clock} from "lucide-react";
 import {TimelineControls} from "./TimelineControls";
@@ -22,7 +21,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
     const startTime = "08:00";
     const endTime = "17:00";
 
-    const [zoomLevel, setZoomLevel] = useState(1.5);
+    const [zoomLevel, setZoomLevel] = useState(1);
     const [panOffset, setPanOffset] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState(0);
@@ -37,11 +36,56 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const currentPanRef = useRef(panOffset);
+    const containerWidthRef = useRef(0);
 
     // Update ref when panOffset changes
     useEffect(() => {
         currentPanRef.current = panOffset;
     }, [panOffset]);
+
+    // Store container width for calculations
+    useEffect(() => {
+        if (timelineRef.current) {
+            containerWidthRef.current = timelineRef.current.clientWidth;
+            
+            // Initial positioning to center current time
+            if (shouldFollowTime) {
+                centerOnCurrentTime(zoomLevel);
+            }
+        }
+        
+        const handleResize = () => {
+            if (timelineRef.current) {
+                containerWidthRef.current = timelineRef.current.clientWidth;
+                
+                // Re-center on resize if following time
+                if (shouldFollowTime) {
+                    centerOnCurrentTime(zoomLevel);
+                } else {
+                    // Adjust pan offset proportionally to maintain view position
+                    const maxPan = Math.max(0, (containerWidthRef.current * zoomLevel) - containerWidthRef.current);
+                    setPanOffset(prev => Math.max(0, Math.min(prev, maxPan)));
+                }
+            }
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [zoomLevel, shouldFollowTime]);
+
+    // Center timeline on current time position
+    const centerOnCurrentTime = (zoom: number) => {
+        if (!timelineRef.current) return;
+        
+        const timelineWidth = containerWidthRef.current;
+        const centerPosition = (currentTimePosition * timelineWidth) - (timelineWidth / 2);
+        
+        // Scale by zoom but ensure we don't exceed bounds
+        const maxPan = Math.max(0, (timelineWidth * zoom) - timelineWidth);
+        const newOffset = Math.max(0, Math.min(centerPosition * zoom, maxPan));
+        
+        setPanOffset(newOffset);
+    };
 
     // Update current time position every second
     useEffect(() => {
@@ -65,15 +109,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
 
             // Auto-pan to follow current time if enabled and not dragging
             if (shouldFollowTime && !isDragging && timelineRef.current) {
-                // Calculate center position for timeline
-                const newOffset = (position * zoomLevel * timelineRef.current.clientWidth) -
-                    (timelineRef.current.clientWidth / 2);
-
-                // Calculate maximum possible offset
-                const maxPan = Math.max(0, (timelineRef.current.clientWidth * zoomLevel) - timelineRef.current.clientWidth);
-
-                // Set pan offset, ensuring it stays within bounds
-                setPanOffset(Math.max(0, Math.min(newOffset, maxPan)));
+                centerOnCurrentTime(zoomLevel);
             }
         };
 
@@ -84,19 +120,27 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
 
     const handleZoomIn = () => {
         setZoomLevel(prev => {
-            // Limit max zoom to 4x to prevent bugs
-            const newZoom = Math.min(prev + 0.5, 4);
-
-            // Center zoom on current time position
-            if (timelineRef.current && shouldFollowTime) {
-                const timelineWidth = timelineRef.current.clientWidth;
-                const centerOnCurrentTime = (currentTimePosition * newZoom * timelineWidth) - (timelineWidth / 2);
-                
-                // Ensure offset is within bounds
-                const maxPan = Math.max(0, (timelineWidth * newZoom) - timelineWidth);
-                setPanOffset(Math.max(0, Math.min(centerOnCurrentTime, maxPan)));
+            // Limit max zoom to 3x to prevent issues
+            const newZoom = Math.min(prev + 0.25, 3);
+            
+            // Maintain current view center during zoom
+            if (timelineRef.current) {
+                if (shouldFollowTime) {
+                    // If following time, center on current time
+                    centerOnCurrentTime(newZoom);
+                } else {
+                    // Otherwise, maintain the current center point
+                    const viewportCenter = panOffset + (containerWidthRef.current / 2);
+                    const normalizedCenter = viewportCenter / (containerWidthRef.current * prev);
+                    const newCenterOffset = normalizedCenter * (containerWidthRef.current * newZoom);
+                    const newPanOffset = newCenterOffset - (containerWidthRef.current / 2);
+                    
+                    // Ensure offset is within bounds
+                    const maxPan = Math.max(0, (containerWidthRef.current * newZoom) - containerWidthRef.current);
+                    setPanOffset(Math.max(0, Math.min(newPanOffset, maxPan)));
+                }
             }
-
+            
             return newZoom;
         });
     };
@@ -104,38 +148,37 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
     const handleZoomOut = () => {
         setZoomLevel(prev => {
             if (prev <= 1) return 1;
-
-            const newZoom = Math.max(prev - 0.5, 1);
             
-            // Center zoom on current time position when zooming out
-            if (timelineRef.current && shouldFollowTime) {
-                const timelineWidth = timelineRef.current.clientWidth;
-                const centerOnCurrentTime = (currentTimePosition * newZoom * timelineWidth) - (timelineWidth / 2);
-                
-                // Ensure offset is within bounds
-                const maxPan = Math.max(0, (timelineWidth * newZoom) - timelineWidth);
-                setPanOffset(Math.max(0, Math.min(centerOnCurrentTime, maxPan)));
+            const newZoom = Math.max(prev - 0.25, 1);
+            
+            // Maintain current view center during zoom
+            if (timelineRef.current) {
+                if (shouldFollowTime) {
+                    // If following time, center on current time
+                    centerOnCurrentTime(newZoom);
+                } else {
+                    // Otherwise, maintain the current center point
+                    const viewportCenter = panOffset + (containerWidthRef.current / 2);
+                    const normalizedCenter = viewportCenter / (containerWidthRef.current * prev);
+                    const newCenterOffset = normalizedCenter * (containerWidthRef.current * newZoom);
+                    const newPanOffset = newCenterOffset - (containerWidthRef.current / 2);
+                    
+                    // Ensure offset is within bounds
+                    const maxPan = Math.max(0, (containerWidthRef.current * newZoom) - containerWidthRef.current);
+                    setPanOffset(Math.max(0, Math.min(newPanOffset, maxPan)));
+                }
             }
-
+            
             return newZoom;
         });
     };
 
     const handleReset = () => {
-        setZoomLevel(1.5);
+        setZoomLevel(1);
         setShouldFollowTime(true);
-
+        
         // Reset pan to center on current time
-        if (timelineRef.current) {
-            const timelineWidth = timelineRef.current.clientWidth;
-            // Calculate center on current time
-            const centerOnCurrentTime = (currentTimePosition * 1.5 * timelineWidth) -
-                (timelineWidth / 2);
-
-            // Ensure offset is within bounds
-            const maxPan = Math.max(0, (timelineWidth * 1.5) - timelineWidth);
-            setPanOffset(Math.max(0, Math.min(centerOnCurrentTime, maxPan)));
-        }
+        centerOnCurrentTime(1);
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -154,7 +197,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
             const deltaX = dragStart - e.clientX;
             
             // Calculate maximum pan offset based on zoom level and container width
-            const timelineWidth = timelineRef.current.clientWidth;
+            const timelineWidth = containerWidthRef.current;
             const maxPan = Math.max(0, (timelineWidth * zoomLevel) - timelineWidth);
             
             // Using the current value from ref to avoid closure issues
@@ -269,7 +312,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
 
                     {/* Timeline container with zoom and pan */}
                     <div
-                        className="absolute top-8 left-0 h-full"
+                        className="absolute top-8 left-0 h-full w-full"
                         style={{
                             width: `${100 * zoomLevel}%`,
                             transform: `translateX(-${panOffset}px)`,
