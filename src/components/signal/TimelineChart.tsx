@@ -33,6 +33,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         reason: string;
     } | null>(null);
     const [currentTimePosition, setCurrentTimePosition] = useState(0);
+    const [shouldFollowTime, setShouldFollowTime] = useState(true);
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const currentPanRef = useRef(panOffset);
@@ -62,8 +63,8 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
             const position = Math.max(0, Math.min(1, (currentMinutes - startMinutes) / totalMinutes));
             setCurrentTimePosition(position);
 
-            // Auto-pan to follow current time if not dragging
-            if (!isDragging && timelineRef.current) {
+            // Auto-pan to follow current time if enabled and not dragging
+            if (shouldFollowTime && !isDragging && timelineRef.current) {
                 // Calculate center position for timeline
                 const newOffset = (position * zoomLevel * timelineRef.current.clientWidth) -
                     (timelineRef.current.clientWidth / 2);
@@ -79,7 +80,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         updateCurrentTime(); // Initial update
         const interval = setInterval(updateCurrentTime, 1000);
         return () => clearInterval(interval);
-    }, [zoomLevel, isDragging, startTime, endTime]);
+    }, [zoomLevel, isDragging, startTime, endTime, shouldFollowTime]);
 
     const handleZoomIn = () => {
         setZoomLevel(prev => {
@@ -87,7 +88,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
             const newZoom = Math.min(prev + 0.5, 4);
 
             // Center zoom on current time position
-            if (timelineRef.current) {
+            if (timelineRef.current && shouldFollowTime) {
                 const timelineWidth = timelineRef.current.clientWidth;
                 const centerOnCurrentTime = (currentTimePosition * newZoom * timelineWidth) - (timelineWidth / 2);
                 
@@ -107,7 +108,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
             const newZoom = Math.max(prev - 0.5, 1);
             
             // Center zoom on current time position when zooming out
-            if (timelineRef.current) {
+            if (timelineRef.current && shouldFollowTime) {
                 const timelineWidth = timelineRef.current.clientWidth;
                 const centerOnCurrentTime = (currentTimePosition * newZoom * timelineWidth) - (timelineWidth / 2);
                 
@@ -122,6 +123,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
 
     const handleReset = () => {
         setZoomLevel(1.5);
+        setShouldFollowTime(true);
 
         // Reset pan to center on current time
         if (timelineRef.current) {
@@ -140,6 +142,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         if (zoomLevel > 1) {
             setIsDragging(true);
             setDragStart(e.clientX);
+            setShouldFollowTime(false); // Stop following time when user starts dragging
             document.body.style.cursor = 'grabbing';
             // Prevent text selection during drag
             e.preventDefault();
@@ -301,7 +304,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
 
             <div className="mt-2 text-xs text-muted-foreground">
                 {zoomLevel > 1 ? (
-                    <span>Drag to pan • Click signal bar for details • Zoom: {zoomLevel.toFixed(1)}x</span>
+                    <span>Drag to pan • Click signal bar for details • Zoom: {zoomLevel.toFixed(1)}x {shouldFollowTime ? '• Following current time' : ''}</span>
                 ) : (
                     <span>Click signal bar for details • Use zoom controls for a closer view</span>
                 )}
