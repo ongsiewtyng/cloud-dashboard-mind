@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 
 interface SignalLog {
@@ -127,7 +126,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
     return true;
   };
 
-  // Simulation logic with more realistic patterns
+  // Simulation logic with more realistic patterns and longer running periods
   useEffect(() => {
     let simulationInterval: number | null = null;
     
@@ -135,7 +134,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
       console.log("Starting automated simulation for machine:", selectedMachine);
       
       // Initial random status - start with "running" most of the time for better UX
-      const initialStatus = Math.random() > 0.2 ? "1" : "0";
+      const initialStatus = Math.random() > 0.1 ? "1" : "0"; // 90% chance to start running
       
       // If initial status is downtime, generate random reason
       if (initialStatus === "0") {
@@ -145,15 +144,6 @@ export function useSignalSimulation(selectedMachine: string | null) {
       } else {
         addSignalLog(selectedMachine, initialStatus);
       }
-      
-      // Distribute logs across the workday timeline for more realistic visualization
-      const generateRandomTime = () => {
-        // Generate time between 8:00 and 17:00
-        const hour = Math.floor(Math.random() * 9) + 8; // 8-17
-        const minute = Math.floor(Math.random() * 60);
-        const second = Math.floor(Math.random() * 60);
-        return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
-      };
       
       // Generate historical data with more realistic running/stopping patterns
       const generateHistoricalData = () => {
@@ -185,15 +175,15 @@ export function useSignalSimulation(selectedMachine: string | null) {
           
           logs.push(log);
           
-          // Determine duration before next status change
+          // Determine duration before next status change with longer running periods
           let minutesToAdd: number;
           
           if (currentStatus === "1") {
-            // Running periods are longer (30min to 3 hours)
-            minutesToAdd = Math.floor(Math.random() * 150) + 30;
+            // Running periods are much longer (1-5 hours)
+            minutesToAdd = Math.floor(Math.random() * 240) + 60; // 1-5 hours
           } else {
-            // Downtime periods are shorter (5min to 45min)
-            minutesToAdd = Math.floor(Math.random() * 40) + 5;
+            // Downtime periods are shorter (5-30 min)
+            minutesToAdd = Math.floor(Math.random() * 25) + 5; // 5-30 minutes
           }
           
           // Add duration to current time for next status
@@ -227,17 +217,17 @@ export function useSignalSimulation(selectedMachine: string | null) {
       }
       
       simulationInterval = window.setInterval(() => {
-        // For more realistic simulation:
-        // - If running, only 10% chance to stop (machines should run longer)
-        // - If stopped, 70% chance to start (downtime should be shorter)
+        // More realistic simulation with longer running times:
+        // - If running, only 5% chance to stop (machines should run much longer)
+        // - If stopped, 80% chance to start (downtime should be shorter)
         let randomStatus: "0" | "1";
         
         if (lastStatus === "1") {
-          // If was running, only 10% chance to stop (more realistic)
-          randomStatus = Math.random() < 0.1 ? "0" : "1";
+          // If was running, very low chance to stop (5%)
+          randomStatus = Math.random() < 0.05 ? "0" : "1"; 
         } else {
-          // If was stopped, 70% chance to start (downtime usually resolves quickly)
-          randomStatus = Math.random() < 0.7 ? "1" : "0";
+          // If was stopped, high chance to start (80%)
+          randomStatus = Math.random() < 0.8 ? "1" : "0";
         }
         
         // Only change status if different from current
@@ -251,7 +241,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
             addSignalLog(selectedMachine, randomStatus);
           }
         }
-      }, Math.floor(Math.random() * 10000) + 15000); // Random interval between 15-25 seconds
+      }, Math.floor(Math.random() * 15000) + 30000); // Longer intervals: 30-45 seconds
     }
     
     return () => {

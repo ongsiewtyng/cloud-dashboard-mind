@@ -44,6 +44,12 @@ export function TimelineSignal({
       }}
       onClick={onClick}
       title={tooltipContent}
-    />
+    >
+      {width > 5 && (
+        <div className="absolute inset-0 px-2 text-xs text-white flex items-center overflow-hidden whitespace-nowrap">
+          {duration && width > 10 ? duration : ''}
+        </div>
+      )}
+    </div>
   );
 }
