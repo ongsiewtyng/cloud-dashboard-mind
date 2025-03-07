@@ -21,6 +21,7 @@ interface TimelineChartProps {
     }>;
 }
 
+
 export function TimelineChart({timelineData}: TimelineChartProps) {
     const startTime = "08:00";
     const endTime = "17:00";
