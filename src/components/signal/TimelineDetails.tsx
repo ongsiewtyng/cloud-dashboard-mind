@@ -6,6 +6,8 @@ interface TimelineDetailsProps {
     id: string;
     status: number;
     timestamp: string;
+    endTimestamp?: string;
+    duration?: string;
     reason: string;
   } | null;
 }
@@ -32,9 +34,21 @@ export function TimelineDetails({ selectedSignal }: TimelineDetailsProps) {
           </span>
         </div>
         <div>
-          <span className="text-slate-500">Time:</span>{" "}
+          <span className="text-slate-500">Start Time:</span>{" "}
           <span className="font-medium">{selectedSignal.timestamp}</span>
         </div>
+        {selectedSignal.endTimestamp && (
+          <div>
+            <span className="text-slate-500">End Time:</span>{" "}
+            <span className="font-medium">{selectedSignal.endTimestamp}</span>
+          </div>
+        )}
+        {selectedSignal.duration && (
+          <div>
+            <span className="text-slate-500">Duration:</span>{" "}
+            <span className="font-medium">{selectedSignal.duration}</span>
+          </div>
+        )}
         {selectedSignal.reason && (
           <div className="col-span-2">
             <span className="text-slate-500">Reason:</span>{" "}

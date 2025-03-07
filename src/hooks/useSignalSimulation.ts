@@ -6,6 +6,8 @@ interface SignalLog {
   machineId: string;
   status: "0" | "1";
   timestamp: string;
+  endTimestamp?: string;
+  duration?: string;
   reason: string;
 }
 
@@ -14,6 +16,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
   const [newLogReason, setNewLogReason] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
   const [lastStatus, setLastStatus] = useState<"0" | "1">("1");
+  const [lastLogTime, setLastLogTime] = useState<Date | null>(null);
 
   // Automatically start simulation when a machine is selected
   useEffect(() => {
@@ -23,6 +26,28 @@ export function useSignalSimulation(selectedMachine: string | null) {
       setIsSimulating(false);
     }
   }, [selectedMachine]);
+
+  // Helper function to calculate time difference
+  const getTimeDifference = (start: string, end: string): string => {
+    const startDate = new Date(`1970-01-01T${start}Z`);
+    const endDate = new Date(`1970-01-01T${end}Z`);
+    
+    // If end time is before start time, assume it's the next day
+    if (endDate < startDate) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+    
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const remainingMins = diffMins % 60;
+    
+    if (diffHours > 0) {
+      return `${diffHours}h ${remainingMins}m`;
+    } else {
+      return `${remainingMins}m`;
+    }
+  };
 
   const addSignalLog = (machineId: string, status: "0" | "1", autoReason?: string) => {
     let reason = status === "1" ? "" : newLogReason;
@@ -37,6 +62,28 @@ export function useSignalSimulation(selectedMachine: string | null) {
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const seconds = now.getSeconds().toString().padStart(2, '0');
     const timestamp = `${hours}:${minutes}:${seconds}`;
+
+    // Find the previous log (if any) to calculate duration
+    const previousLogs = signalLogs.filter(log => log.machineId === machineId);
+    const previousLog = previousLogs.length > 0 ? previousLogs[0] : null;
+    
+    let endTimestamp: string | undefined;
+    let duration: string | undefined;
+    
+    // If there was a previous log, update it with end time and duration
+    if (previousLog && previousLog.status !== status) {
+      endTimestamp = timestamp;
+      duration = getTimeDifference(previousLog.timestamp, timestamp);
+      
+      // Update the previous log with end time and duration
+      setSignalLogs(prevLogs => 
+        prevLogs.map(log => 
+          log.id === previousLog.id 
+            ? { ...log, endTimestamp, duration } 
+            : log
+        )
+      );
+    }
 
     const newLog = {
       id: Date.now().toString(),
@@ -75,11 +122,12 @@ export function useSignalSimulation(selectedMachine: string | null) {
     setSignalLogs(prevLogs => [newLog, ...prevLogs]);
     setNewLogReason("");
     setLastStatus(status);
+    setLastLogTime(now);
 
     return true;
   };
 
-  // Simulation logic
+  // Simulation logic with more realistic patterns
   useEffect(() => {
     let simulationInterval: number | null = null;
     
@@ -107,27 +155,69 @@ export function useSignalSimulation(selectedMachine: string | null) {
         return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
       };
       
-      // Generate some historical data for better timeline visualization
+      // Generate historical data with more realistic running/stopping patterns
       const generateHistoricalData = () => {
-        const statuses: ("0" | "1")[] = ["0", "1"];
         const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
+        let currentStatus: "0" | "1" = "1"; // Start with running
+        let currentTime = new Date();
+        currentTime.setHours(8, 0, 0); // Start at 8:00 AM
         
-        // Generate 5-10 historical records
-        const numRecords = Math.floor(Math.random() * 6) + 5;
+        const endWorkday = new Date();
+        endWorkday.setHours(17, 0, 0); // End at 5:00 PM
         
-        for (let i = 0; i < numRecords; i++) {
-          const status = statuses[Math.floor(Math.random() * statuses.length)];
-          const reason = status === "0" ? reasons[Math.floor(Math.random() * reasons.length)] : "";
+        const logs: SignalLog[] = [];
+        
+        while (currentTime < endWorkday) {
+          // Record current status
+          const hours = currentTime.getHours().toString().padStart(2, '0');
+          const minutes = currentTime.getMinutes().toString().padStart(2, '0');
+          const seconds = currentTime.getSeconds().toString().padStart(2, '0');
+          const timestamp = `${hours}:${minutes}:${seconds}`;
           
-          const historicalLog = {
-            id: `hist-${Date.now()}-${i}`,
+          // Add log for current status
+          const log: SignalLog = {
+            id: `hist-${Date.now()}-${logs.length}`,
             machineId: selectedMachine,
-            status,
-            timestamp: generateRandomTime(),
-            reason,
+            status: currentStatus,
+            timestamp,
+            reason: currentStatus === "0" ? reasons[Math.floor(Math.random() * reasons.length)] : ""
           };
           
-          setSignalLogs(prev => [historicalLog, ...prev]);
+          logs.push(log);
+          
+          // Determine duration before next status change
+          let minutesToAdd: number;
+          
+          if (currentStatus === "1") {
+            // Running periods are longer (30min to 3 hours)
+            minutesToAdd = Math.floor(Math.random() * 150) + 30;
+          } else {
+            // Downtime periods are shorter (5min to 45min)
+            minutesToAdd = Math.floor(Math.random() * 40) + 5;
+          }
+          
+          // Add duration to current time for next status
+          currentTime = new Date(currentTime.getTime() + minutesToAdd * 60000);
+          
+          // Add end timestamp and duration to previous log
+          if (logs.length > 0) {
+            const prevLog = logs[logs.length - 1];
+            const newHours = currentTime.getHours().toString().padStart(2, '0');
+            const newMinutes = currentTime.getMinutes().toString().padStart(2, '0');
+            const newSeconds = currentTime.getSeconds().toString().padStart(2, '0');
+            const endTimestamp = `${newHours}:${newMinutes}:${newSeconds}`;
+            
+            prevLog.endTimestamp = endTimestamp;
+            prevLog.duration = getTimeDifference(prevLog.timestamp, endTimestamp);
+          }
+          
+          // Toggle status for next iteration
+          currentStatus = currentStatus === "1" ? "0" : "1";
+        }
+        
+        // Add logs in reverse order (newest first)
+        for (const log of logs.reverse()) {
+          setSignalLogs(prev => [log, ...prev]);
         }
       };
       
@@ -137,28 +227,31 @@ export function useSignalSimulation(selectedMachine: string | null) {
       }
       
       simulationInterval = window.setInterval(() => {
-        // For more balanced on/off simulation, use the lastStatus to determine next status
-        // If last was running (1), 40% chance of stopping (0)
-        // If last was stopped (0), 60% chance of starting (1)
+        // For more realistic simulation:
+        // - If running, only 10% chance to stop (machines should run longer)
+        // - If stopped, 70% chance to start (downtime should be shorter)
         let randomStatus: "0" | "1";
         
         if (lastStatus === "1") {
-          // If was running, 40% chance to stop
-          randomStatus = Math.random() < 0.4 ? "0" : "1";
+          // If was running, only 10% chance to stop (more realistic)
+          randomStatus = Math.random() < 0.1 ? "0" : "1";
         } else {
-          // If was stopped, 60% chance to start
-          randomStatus = Math.random() < 0.6 ? "1" : "0";
+          // If was stopped, 70% chance to start (downtime usually resolves quickly)
+          randomStatus = Math.random() < 0.7 ? "1" : "0";
         }
         
-        // Generate random reason for downtime
-        if (randomStatus === "0") {
-          const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
-          const randomReason = reasons[Math.floor(Math.random() * reasons.length)];
-          addSignalLog(selectedMachine, randomStatus, randomReason);
-        } else {
-          addSignalLog(selectedMachine, randomStatus);
+        // Only change status if different from current
+        if (randomStatus !== lastStatus) {
+          // Generate random reason for downtime
+          if (randomStatus === "0") {
+            const reasons = ["maintenance", "breakdown", "setup", "material", "operator", "quality", "planned", "other"];
+            const randomReason = reasons[Math.floor(Math.random() * reasons.length)];
+            addSignalLog(selectedMachine, randomStatus, randomReason);
+          } else {
+            addSignalLog(selectedMachine, randomStatus);
+          }
         }
-      }, Math.floor(Math.random() * 5000) + 5000); // Random interval between 5-10 seconds
+      }, Math.floor(Math.random() * 10000) + 15000); // Random interval between 15-25 seconds
     }
     
     return () => {

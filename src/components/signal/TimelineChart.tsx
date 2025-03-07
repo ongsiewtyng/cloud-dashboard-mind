@@ -1,3 +1,4 @@
+
 import {useState, useRef, useEffect} from "react";
 import {Clock} from "lucide-react";
 import {TimelineControls} from "./TimelineControls";
@@ -13,6 +14,8 @@ interface TimelineChartProps {
         status: number;
         position: number;
         timestamp: string;
+        endTimestamp?: string;
+        duration?: string;
         reason: string;
     }>;
 }
@@ -29,6 +32,8 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         id: string;
         status: number;
         timestamp: string;
+        endTimestamp?: string;
+        duration?: string;
         reason: string;
     } | null>(null);
     const [currentTimePosition, setCurrentTimePosition] = useState(0);
@@ -117,6 +122,49 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         const interval = setInterval(updateCurrentTime, 1000);
         return () => clearInterval(interval);
     }, [zoomLevel, isDragging, startTime, endTime, shouldFollowTime]);
+
+    // Enhance timeline data by calculating widths for signals based on their duration
+    const enhanceTimelineData = () => {
+        if (!timelineData.length) return [];
+        
+        const timeToMinutes = (timeStr: string) => {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        
+        const startMinutes = timeToMinutes(startTime);
+        const endMinutes = timeToMinutes(endTime);
+        const totalMinutes = endMinutes - startMinutes;
+        
+        return timelineData.map((signal, index) => {
+            // Default position calculation (start time)
+            const position = signal.position;
+            
+            // Calculate width if we have duration information
+            let width = 0.5; // Default narrow width
+            
+            if (signal.endTimestamp) {
+                const signalStartMinutes = timeToMinutes(signal.timestamp);
+                const signalEndMinutes = timeToMinutes(signal.endTimestamp);
+                
+                // Handle case where end time is on the next day
+                const adjustedEndMinutes = signalEndMinutes < signalStartMinutes 
+                    ? signalEndMinutes + (24 * 60) 
+                    : signalEndMinutes;
+                
+                const signalDurationMinutes = adjustedEndMinutes - signalStartMinutes;
+                width = (signalDurationMinutes / totalMinutes) * 100;
+            }
+            
+            return {
+                ...signal,
+                position,
+                width: Math.max(0.5, width) // Ensure minimum visibility
+            };
+        });
+    };
+
+    const enhancedTimelineData = enhanceTimelineData();
 
     const handleZoomIn = () => {
         setZoomLevel(prev => {
@@ -222,7 +270,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         }
     };
 
-    const handleSignalClick = (signalData: typeof timelineData[0], e: React.MouseEvent) => {
+    const handleSignalClick = (signalData: typeof enhancedTimelineData[0], e: React.MouseEvent) => {
         e.stopPropagation();
         setSelectedSignalDetails(signalData);
     };
@@ -318,14 +366,17 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
                             transform: `translateX(-${panOffset}px)`,
                         }}
                     >
-                        {/* Signal events */}
-                        {timelineData.map((data) => (
+                        {/* Signal events as bars with proper width based on duration */}
+                        {enhancedTimelineData.map((data) => (
                             <TimelineSignal
                                 key={data.id}
                                 id={data.id}
                                 position={data.position}
+                                width={data.width}
                                 status={data.status}
                                 timestamp={data.timestamp}
+                                endTimestamp={data.endTimestamp}
+                                duration={data.duration}
                                 reason={data.reason}
                                 isSelected={selectedSignalDetails?.id === data.id}
                                 onClick={(e) => handleSignalClick(data, e)}
