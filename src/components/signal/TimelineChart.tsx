@@ -1,4 +1,3 @@
-
 import {useState, useRef, useEffect} from "react";
 import {Clock} from "lucide-react";
 import {TimelineControls} from "./TimelineControls";
@@ -6,6 +5,7 @@ import {TimelineSignal} from "./TimelineSignal";
 import {TimelineDetails} from "./TimelineDetails";
 import {TimeLabels} from "./TimeLabels";
 import {TimeIndicator} from "./TimeIndicator";
+import {generateHourlyLabels, formatTimeLabel} from "@/utils/timelineUtils";
 import * as React from "react";
 
 interface TimelineChartProps {
@@ -13,6 +13,7 @@ interface TimelineChartProps {
         id: string;
         status: number;
         position: number;
+        width: number;
         timestamp: string;
         endTimestamp?: string;
         duration?: string;
@@ -83,11 +84,11 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         if (!timelineRef.current) return;
         
         const timelineWidth = containerWidthRef.current;
-        const centerPosition = (currentTimePosition * timelineWidth) - (timelineWidth / 2);
+        const centerPosition = (currentTimePosition * timelineWidth * zoom) - (timelineWidth / 2);
         
         // Scale by zoom but ensure we don't exceed bounds
         const maxPan = Math.max(0, (timelineWidth * zoom) - timelineWidth);
-        const newOffset = Math.max(0, Math.min(centerPosition * zoom, maxPan));
+        const newOffset = Math.max(0, Math.min(centerPosition, maxPan));
         
         setPanOffset(newOffset);
     };
@@ -122,49 +123,6 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         const interval = setInterval(updateCurrentTime, 1000);
         return () => clearInterval(interval);
     }, [zoomLevel, isDragging, startTime, endTime, shouldFollowTime]);
-
-    // Enhance timeline data by calculating widths for signals based on their duration
-    const enhanceTimelineData = () => {
-        if (!timelineData.length) return [];
-        
-        const timeToMinutes = (timeStr: string) => {
-            const [hours, minutes] = timeStr.split(':').map(Number);
-            return hours * 60 + minutes;
-        };
-        
-        const startMinutes = timeToMinutes(startTime);
-        const endMinutes = timeToMinutes(endTime);
-        const totalMinutes = endMinutes - startMinutes;
-        
-        return timelineData.map((signal, index) => {
-            // Default position calculation (start time)
-            const position = signal.position;
-            
-            // Calculate width if we have duration information
-            let width = 0.5; // Default narrow width
-            
-            if (signal.endTimestamp) {
-                const signalStartMinutes = timeToMinutes(signal.timestamp);
-                const signalEndMinutes = timeToMinutes(signal.endTimestamp);
-                
-                // Handle case where end time is on the next day
-                const adjustedEndMinutes = signalEndMinutes < signalStartMinutes 
-                    ? signalEndMinutes + (24 * 60) 
-                    : signalEndMinutes;
-                
-                const signalDurationMinutes = adjustedEndMinutes - signalStartMinutes;
-                width = (signalDurationMinutes / totalMinutes) * 100;
-            }
-            
-            return {
-                ...signal,
-                position,
-                width: Math.max(0.5, width) // Ensure minimum visibility
-            };
-        });
-    };
-
-    const enhancedTimelineData = enhanceTimelineData();
 
     const handleZoomIn = () => {
         setZoomLevel(prev => {
@@ -270,46 +228,12 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
         }
     };
 
-    const handleSignalClick = (signalData: typeof enhancedTimelineData[0], e: React.MouseEvent) => {
+    const handleSignalClick = (signalData: typeof timelineData[0], e: React.MouseEvent) => {
         e.stopPropagation();
         setSelectedSignalDetails(signalData);
     };
 
-    const formatTimeLabel = (time: string) => {
-        const [hours, minutes] = time.split(':').map(Number);
-        const period = hours >= 12 ? 'PM' : 'AM';
-        const formattedHours = hours % 12 || 12;
-        return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-    };
-
-    // Generate hourly time labels
-    const generateHourlyLabels = () => {
-        const labels = [];
-        const [startHour] = startTime.split(':').map(Number);
-        const [endHour] = endTime.split(':').map(Number);
-
-        for (let hour = startHour; hour <= endHour; hour++) {
-            const timeStr = `${hour}:00`;
-            const minutes = hour * 60;
-            const [startH, startM] = startTime.split(':').map(Number);
-            const startMinutes = startH * 60 + startM;
-            const [endH, endM] = endTime.split(':').map(Number);
-            const endMinutes = endH * 60 + endM;
-            const totalMinutes = endMinutes - startMinutes;
-            const position = (minutes - startMinutes) / totalMinutes;
-
-            if (position >= 0 && position <= 1) {
-                labels.push({
-                    hour,
-                    position: position * 100,
-                    label: formatTimeLabel(timeStr)
-                });
-            }
-        }
-        return labels;
-    };
-
-    const hourlyLabels = generateHourlyLabels();
+    const hourlyLabels = generateHourlyLabels(startTime, endTime);
 
     return (
         <div className="mb-6 bg-slate-100 p-4 rounded-lg shadow-sm" onClick={() => setSelectedSignalDetails(null)}>
@@ -367,7 +291,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
                         }}
                     >
                         {/* Signal events as bars with proper width based on duration */}
-                        {enhancedTimelineData.map((data) => (
+                        {timelineData.map((data) => (
                             <TimelineSignal
                                 key={data.id}
                                 id={data.id}
