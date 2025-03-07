@@ -2,7 +2,7 @@
 // Convert time string to minutes since start of day for position calculation
 export const timeToMinutes = (timeStr: string) => {
   const [hours, minutes, seconds = '0'] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes + (seconds / 60);
+  return hours * 60 + minutes + (Number(seconds) / 60);
 };
 
 // Format time label with AM/PM
