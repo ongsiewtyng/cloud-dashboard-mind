@@ -1,52 +1,28 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
+import { ActivitySquare } from "lucide-react";
 import { TimelineChart } from "./signal/TimelineChart";
 import { LogsTable } from "./signal/LogsTable";
-import { ActivitySquare } from "lucide-react";
 import { useTimelineData } from "@/hooks/useTimelineData";
-
-interface SignalLog {
-  id: string;
-  machineId: string;
-  status: "0" | "1";
-  timestamp: string;
-  endTimestamp?: string;
-  duration?: string;
-  reason: string;
-}
+import { type SignalLog } from "@/lib/signal-service";
 
 interface SignalHistoryProps {
   machineId: string;
   signalLogs: SignalLog[];
   currentStatus: "0" | "1";
   onAddLog: (machineId: string, status: "0" | "1") => void;
-  newLogReason: string;
-  setNewLogReason: (reason: string) => void;
+  updateLogReason: (logId: string, reason: string) => Promise<boolean>;
 }
 
 export function SignalHistory({ 
   machineId, 
   signalLogs, 
   currentStatus, 
-  onAddLog, 
-  newLogReason, 
-  setNewLogReason 
+  onAddLog,
+  updateLogReason
 }: SignalHistoryProps) {
-  const filteredLogs = signalLogs.filter(log => log.machineId === machineId);
   const timelineData = useTimelineData(signalLogs, machineId);
-
-  const handleAddLog = (status: "0" | "1") => {
-    onAddLog(machineId, status);
-    
-    // Show success toast after calling onAddLog
-    if (status === "1") {
-      toast.success("Machine running status recorded successfully");
-    } else {
-      toast.success("Machine downtime recorded successfully");
-    }
-  };
 
   return (
     <Card className="shadow-md border-slate-200">
@@ -58,7 +34,10 @@ export function SignalHistory({
       </CardHeader>
       <CardContent className="p-4 space-y-4">
         <TimelineChart timelineData={timelineData} />
-        <LogsTable filteredLogs={filteredLogs} />
+        <LogsTable 
+          filteredLogs={signalLogs} 
+          onUpdateReason={updateLogReason} 
+        />
       </CardContent>
     </Card>
   );

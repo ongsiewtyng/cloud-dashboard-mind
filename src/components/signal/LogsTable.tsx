@@ -4,23 +4,28 @@ import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 
 interface SignalLog {
   id: string;
   machineId: string;
   status: "0" | "1";
   timestamp: string;
+  endTimestamp?: string;
+  duration?: string;
   reason: string;
 }
 
 interface LogsTableProps {
   filteredLogs: SignalLog[];
+  onUpdateReason?: (logId: string, reason: string) => Promise<boolean>;
 }
 
-export function LogsTable({ filteredLogs }: LogsTableProps) {
+export function LogsTable({ filteredLogs, onUpdateReason }: LogsTableProps) {
   const [selectedLog, setSelectedLog] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
   const rowsPerPage = 5;
   
   const totalPages = Math.ceil(filteredLogs.length / rowsPerPage);
@@ -47,18 +52,31 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
     setEditReason(currentReason);
   };
 
-  const saveReason = () => {
-      if (!selectedLog) return;
-
-      // Find the log and update its reason locally
-      const logIndex = filteredLogs.findIndex(log => log.id === selectedLog);
-      if (logIndex !== -1) {
-        filteredLogs[logIndex].reason = editReason;
+  const saveReason = async () => {
+    if (!selectedLog || !onUpdateReason) {
+      setSelectedLog(null);
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      const success = await onUpdateReason(selectedLog, editReason);
+      
+      if (success) {
+        toast.success("Downtime reason updated successfully");
+      } else {
+        toast.error("Failed to update downtime reason");
       }
-
+    } catch (error) {
+      console.error("Error saving reason:", error);
+      toast.error("An error occurred while updating the reason");
+    } finally {
+      setIsSaving(false);
       setSelectedLog(null);
       setEditReason("");
-    };
+    }
+  };
   
   return (
     <>
@@ -67,6 +85,7 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
           <TableRow>
             <TableHead>Status</TableHead>
             <TableHead>Time</TableHead>
+            <TableHead>Duration</TableHead>
             <TableHead>Reason</TableHead>
             <TableHead className="w-16"></TableHead>
           </TableRow>
@@ -78,6 +97,7 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
                 {log.status === "1" ? "Running" : "Stopped"}
               </TableCell>
               <TableCell>{log.timestamp}</TableCell>
+              <TableCell>{log.duration || "-"}</TableCell>
               <TableCell>
                 {selectedLog === log.id ? (
                   <Select value={editReason} onValueChange={setEditReason}>
@@ -87,22 +107,24 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
                     <SelectContent>
                       <SelectItem value="maintenance">Maintenance</SelectItem>
                       <SelectItem value="breakdown">Breakdown</SelectItem>
-                      <SelectItem value="setup/changeover">Setup/Changeover</SelectItem>
-                      <SelectItem value="material shortage">Material Shortage</SelectItem>
-                      <SelectItem value="no operator">No Operator</SelectItem>
-                      <SelectItem value="quality issue">Quality Issue</SelectItem>
-                      <SelectItem value="planned downtime">Planned Downtime</SelectItem>
+                      <SelectItem value="setup">Setup/Changeover</SelectItem>
+                      <SelectItem value="material">Material Shortage</SelectItem>
+                      <SelectItem value="operator">No Operator</SelectItem>
+                      <SelectItem value="quality">Quality Issue</SelectItem>
+                      <SelectItem value="planned">Planned Downtime</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
-                  log.reason.replace(/\b\w/g, (char) => char.toUpperCase())
+                  log.reason ? log.reason.replace(/\b\w/g, (char) => char.toUpperCase()) : "-"
                 )}
               </TableCell>
               <TableCell>
-                {log.status === "0" && (
+                {log.status === "0" && onUpdateReason && (
                   selectedLog === log.id ? (
-                    <Button size="sm" onClick={saveReason}>Save</Button>
+                    <Button size="sm" onClick={saveReason} disabled={isSaving}>
+                      {isSaving ? "Saving..." : "Save"}
+                    </Button>
                   ) : (
                     <Button size="sm" variant="outline" onClick={() => handleEditReason(log.id, log.reason)}>
                       Edit
@@ -114,7 +136,7 @@ export function LogsTable({ filteredLogs }: LogsTableProps) {
           ))}
           {filteredLogs.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground py-4">
+              <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
                 No signal logs recorded
               </TableCell>
             </TableRow>

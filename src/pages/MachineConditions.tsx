@@ -1,5 +1,4 @@
 
-import { useState, useEffect } from "react";
 import { useMachineStore } from "@/lib/machine-service";
 import { MachineSidebar } from "@/components/MachineSidebar";
 import { MachineDetails } from "@/components/MachineDetails";
@@ -13,9 +12,9 @@ const MachineConditions = () => {
   const { machines, selectedMachine, handleMachineClick, handleClosePanel } = useMachineSelection();
   const { 
     signalLogs, 
-    newLogReason, 
-    setNewLogReason, 
-    addSignalLog 
+    addSignalLog,
+    updateLogReason,
+    lastStatus
   } = useSignalSimulation(selectedMachine);
 
   const handleAddLog = (machineId: string, status: "0" | "1") => {
@@ -48,7 +47,7 @@ const MachineConditions = () => {
             />
             
             <div className="text-sm text-muted-foreground bg-muted rounded-lg p-3 mb-2">
-              <span className="font-medium">Automatic Simulation Active:</span> Machine status is being simulated in real-time with both running and stopped states. Data updates every 5-10 seconds.
+              <span className="font-medium">Real-time Monitoring Active:</span> Machine status is being tracked in real-time between 8:00 AM and 5:00 PM with persistent storage. Data is saved to Firebase and will continue updating even when you're not viewing the page.
             </div>
             
             <SignalHistory 
@@ -56,8 +55,7 @@ const MachineConditions = () => {
               signalLogs={signalLogs}
               currentStatus={currentStatus}
               onAddLog={handleAddLog}
-              newLogReason={newLogReason}
-              setNewLogReason={setNewLogReason}
+              updateLogReason={updateLogReason}
             />
           </div>
         ) : (
