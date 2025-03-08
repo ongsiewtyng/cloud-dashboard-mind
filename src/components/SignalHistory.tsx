@@ -34,9 +34,9 @@ export function SignalHistory({
       </CardHeader>
       <CardContent className="p-4 space-y-4">
         <TimelineChart timelineData={timelineData} />
-        <LogsTable 
-          filteredLogs={signalLogs} 
-          onUpdateReason={updateLogReason} 
+        <LogsTable
+            machineId={machineId}
+            onUpdateReason={updateLogReason}
         />
       </CardContent>
     </Card>

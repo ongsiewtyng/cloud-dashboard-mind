@@ -1,14 +1,12 @@
-
 import { useState, useEffect } from "react";
 import { getRandomDowntimeReason, getCurrentTimeString } from "@/utils/signalUtils";
 import {
   addSignalLog,
   subscribeToSignalLogs,
   updateSignalLogReason,
+  updateAllLogDurations,
   type SignalLog
 } from "@/lib/signal-service";
-import {Simulate} from "react-dom/test-utils";
-import durationChange = Simulate.durationChange;
 
 export function useSignalSimulation(selectedMachine: string | null) {
   const [signalLogs, setSignalLogs] = useState<SignalLog[]>([]);
@@ -39,6 +37,9 @@ export function useSignalSimulation(selectedMachine: string | null) {
 
     // Start simulation
     setIsSimulating(true);
+
+    // Update all log durations when first loading logs for a machine
+    updateAllLogDurations(selectedMachine);
 
     return () => {
       console.log("Unsubscribing from signal logs");
@@ -81,6 +82,10 @@ export function useSignalSimulation(selectedMachine: string | null) {
     if (result) {
       setNewLogReason("");
       setLastStatus(status);
+
+      // Update durations of all logs when a new log is added
+      await updateAllLogDurations(machineId);
+
       return true;
     }
 
@@ -140,7 +145,9 @@ export function useSignalSimulation(selectedMachine: string | null) {
 
   // Update a log's reason
   const updateLogReason = async (logId: string, reason: string) => {
-    const success = await updateSignalLogReason(logId, reason);
+    if (!selectedMachine) return false;
+
+    const success = await updateSignalLogReason(logId, reason, selectedMachine);
     if (success) {
       setNewLogReason("");
     }
@@ -153,6 +160,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
     setNewLogReason,
     addSignalLog: addSignalLogToService,
     updateLogReason,
-    lastStatus
+    lastStatus,
+    timeRange: { startTime, endTime }
   };
 }
