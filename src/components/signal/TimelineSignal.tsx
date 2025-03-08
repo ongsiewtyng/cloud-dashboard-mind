@@ -28,13 +28,14 @@ export function TimelineSignal({
   onClick,
   isActiveSignal = false
 }: TimelineSignalProps) {
-  const [currentWidth, setCurrentWidth] = useState(isActiveSignal ? 0.5 : width);
+  const [currentWidth, setCurrentWidth] = useState(isActiveSignal && status === 1 ? 0.5 : width);
   
   // Effect to animate width for active signals
   useEffect(() => {
-    // If this is a new active signal and it's a "running" signal (status 1), start with minimal width
+    // If this is an active signal and it's a "running" signal (status 1), start with minimal width
     if (isActiveSignal && status === 1) {
-      setCurrentWidth(0.5); // Start with minimal width
+      // Start with minimal width
+      setCurrentWidth(0.5);
       
       // Set up interval to gradually increase width to match target width
       const growInterval = setInterval(() => {
@@ -43,9 +44,9 @@ export function TimelineSignal({
             clearInterval(growInterval);
             return width;
           }
-          return prev + 0.1; // Grow gradually
+          return prev + 0.05; // Grow gradually
         });
-      }, 1000); // Update every second
+      }, 200); // Update more frequently for smoother animation
       
       return () => clearInterval(growInterval);
     } else {
@@ -60,7 +61,7 @@ export function TimelineSignal({
 
   return (
     <div
-      className={`absolute top-0 bottom-0 cursor-pointer transition-all
+      className={`absolute top-0 bottom-0 cursor-pointer
         ${isSelected ? 'z-10' : 'z-0'}`}
       style={{
         left: `${position}%`,
@@ -69,7 +70,7 @@ export function TimelineSignal({
         boxShadow: isSelected
           ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(0,0,0,0.1)'
           : '0 0 0 1px rgba(255,255,255,0.7)',
-        transition: isActiveSignal ? 'width 1s linear' : undefined,
+        transition: isActiveSignal && status === 1 ? 'none' : 'all 0.2s ease',
       }}
       onClick={onClick}
       title={tooltipContent}

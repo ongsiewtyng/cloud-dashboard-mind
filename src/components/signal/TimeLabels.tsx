@@ -1,6 +1,5 @@
 
 import React from "react";
-import { Clock } from "lucide-react";
 
 interface TimeLabelsProps {
   hourlyLabels: Array<{ hour: number; position: number; label: string }>;
@@ -14,7 +13,7 @@ export function TimeLabels({ hourlyLabels, panOffset, zoomLevel }: TimeLabelsPro
       {hourlyLabels.map((label, i) => (
         <div
           key={`hour-${label.hour}`}
-          className="absolute top-0 h-full flex flex-col items-center"
+          className="absolute top-0 h-full flex flex-col items-center justify-start"
           style={{
             left: `${label.position * zoomLevel}%`,
             transform: `translateX(-${panOffset}px)`,
@@ -22,7 +21,7 @@ export function TimeLabels({ hourlyLabels, panOffset, zoomLevel }: TimeLabelsPro
         >
           <div className="h-6 border-l border-slate-300 w-0"></div>
           <span
-            className="text-xs text-slate-500 whitespace-nowrap transform -translate-x-1/2 mt-1">
+            className="text-xs text-slate-500 whitespace-nowrap transform -translate-x-1/2 mt-1 absolute top-8">
             {label.label}
           </span>
         </div>
