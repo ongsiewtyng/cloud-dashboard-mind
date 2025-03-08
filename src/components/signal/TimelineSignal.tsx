@@ -1,18 +1,19 @@
 
 import React, { useEffect, useState } from "react";
+import { formatDistance } from "date-fns";
 
 interface TimelineSignalProps {
   id: string;
   position: number;
-  width: number;  // Added width property to control bar length
+  width: number;
   status: number;
   timestamp: string;
-  endTimestamp?: string;  // Optional end timestamp
-  duration?: string;  // Optional duration display
+  endTimestamp?: string;
+  duration?: string;
   reason: string;
   isSelected: boolean;
   onClick: (e: React.MouseEvent) => void;
-  isActiveSignal?: boolean; // New prop to indicate if this is the currently growing signal
+  isActiveSignal?: boolean;
 }
 
 export function TimelineSignal({
@@ -29,6 +30,7 @@ export function TimelineSignal({
   isActiveSignal = false
 }: TimelineSignalProps) {
   const [currentWidth, setCurrentWidth] = useState(isActiveSignal && status === 1 ? 0.5 : width);
+  const [displayDuration, setDisplayDuration] = useState(duration || '');
   
   // Effect to animate width for active signals
   useEffect(() => {
@@ -54,9 +56,53 @@ export function TimelineSignal({
       setCurrentWidth(width);
     }
   }, [width, isActiveSignal, status]);
+  
+  // Auto-update duration for active running signals
+  useEffect(() => {
+    if (isActiveSignal && status === 1 && !endTimestamp) {
+      // Parse the timestamp
+      const startTime = parseTimeString(timestamp);
+      
+      // Set up interval to update duration every minute
+      const updateInterval = setInterval(() => {
+        const now = new Date();
+        // If now is before startTime, assume it's the same day but later time
+        if (now.getTime() < startTime.getTime()) {
+          startTime.setDate(startTime.getDate() - 1);
+        }
+        
+        // Calculate duration between start time and now
+        const durationFormatted = formatDistance(startTime, now, { includeSeconds: false });
+        setDisplayDuration(durationFormatted);
+      }, 30000); // Update every 30 seconds
+      
+      return () => clearInterval(updateInterval);
+    } else {
+      // For completed signals, use the provided duration
+      setDisplayDuration(duration || '');
+    }
+  }, [isActiveSignal, status, timestamp, endTimestamp, duration]);
+  
+  // Helper to parse HH:MM:SS into a Date object
+  const parseTimeString = (timeStr: string): Date => {
+    const now = new Date();
+    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+    
+    // Create date object with today's date but using the time from the string
+    const date = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      hours,
+      minutes,
+      seconds || 0
+    );
+    
+    return date;
+  };
 
-  const tooltipContent = duration 
-    ? `${status === 1 ? 'Running' : 'Stopped'} from ${timestamp}${endTimestamp ? ` to ${endTimestamp}` : ''} (${duration})`
+  const tooltipContent = displayDuration 
+    ? `${status === 1 ? 'Running' : 'Stopped'} from ${timestamp}${endTimestamp ? ` to ${endTimestamp}` : ''} (${displayDuration})`
     : `${status === 1 ? 'Running' : 'Stopped'} at ${timestamp}`;
 
   return (
@@ -77,7 +123,7 @@ export function TimelineSignal({
     >
       {currentWidth > 5 && (
         <div className="absolute inset-0 px-2 text-xs text-white flex items-center overflow-hidden whitespace-nowrap">
-          {duration && currentWidth > 10 ? duration : ''}
+          {displayDuration && currentWidth > 10 ? displayDuration : ''}
         </div>
       )}
     </div>

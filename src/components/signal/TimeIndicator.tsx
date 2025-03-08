@@ -15,8 +15,8 @@ export function TimeIndicator({ position, panOffset, zoomLevel }: TimeIndicatorP
     <div
       className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-20"
       style={{
-          left: `${positionPercentage * zoomLevel}%`,
-          transform: `translateX(-${panOffset}px)`,
+          left: `${positionPercentage}%`,
+          transform: `translateX(-${panOffset / zoomLevel}px)`,
       }}
     >
       <div

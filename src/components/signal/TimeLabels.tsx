@@ -15,8 +15,8 @@ export function TimeLabels({ hourlyLabels, panOffset, zoomLevel }: TimeLabelsPro
           key={`hour-${label.hour}`}
           className="absolute top-0 h-full flex flex-col items-center justify-start"
           style={{
-            left: `${label.position * zoomLevel}%`,
-            transform: `translateX(-${panOffset}px)`,
+            left: `${label.position}%`,
+            transform: `translateX(-${panOffset / zoomLevel}px)`,
           }}
         >
           <div className="h-6 border-l border-slate-300 w-0"></div>
