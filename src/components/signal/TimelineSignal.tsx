@@ -1,19 +1,18 @@
 
 import React, { useEffect, useState } from "react";
-import { formatDistance } from "date-fns";
 
 interface TimelineSignalProps {
   id: string;
   position: number;
-  width: number;
+  width: number;  // Added width property to control bar length
   status: number;
   timestamp: string;
-  endTimestamp?: string;
-  duration?: string;
+  endTimestamp?: string;  // Optional end timestamp
+  duration?: string;  // Optional duration display
   reason: string;
   isSelected: boolean;
   onClick: (e: React.MouseEvent) => void;
-  isActiveSignal?: boolean;
+  isActiveSignal?: boolean; // New prop to indicate if this is the currently growing signal
 }
 
 export function TimelineSignal({
@@ -29,15 +28,13 @@ export function TimelineSignal({
   onClick,
   isActiveSignal = false
 }: TimelineSignalProps) {
-  const [currentWidth, setCurrentWidth] = useState(isActiveSignal && status === 1 ? 0.5 : width);
-  const [displayDuration, setDisplayDuration] = useState(duration || '');
+  const [currentWidth, setCurrentWidth] = useState(isActiveSignal ? 0.5 : width);
   
   // Effect to animate width for active signals
   useEffect(() => {
-    // If this is an active signal and it's a "running" signal (status 1), start with minimal width
+    // If this is a new active signal and it's a "running" signal (status 1), start with minimal width
     if (isActiveSignal && status === 1) {
-      // Start with minimal width
-      setCurrentWidth(0.5);
+      setCurrentWidth(0.5); // Start with minimal width
       
       // Set up interval to gradually increase width to match target width
       const growInterval = setInterval(() => {
@@ -46,9 +43,9 @@ export function TimelineSignal({
             clearInterval(growInterval);
             return width;
           }
-          return prev + 0.05; // Grow gradually
+          return prev + 0.1; // Grow gradually
         });
-      }, 200); // Update more frequently for smoother animation
+      }, 1000); // Update every second
       
       return () => clearInterval(growInterval);
     } else {
@@ -56,58 +53,14 @@ export function TimelineSignal({
       setCurrentWidth(width);
     }
   }, [width, isActiveSignal, status]);
-  
-  // Auto-update duration for active running signals
-  useEffect(() => {
-    if (isActiveSignal && status === 1 && !endTimestamp) {
-      // Parse the timestamp
-      const startTime = parseTimeString(timestamp);
-      
-      // Set up interval to update duration every minute
-      const updateInterval = setInterval(() => {
-        const now = new Date();
-        // If now is before startTime, assume it's the same day but later time
-        if (now.getTime() < startTime.getTime()) {
-          startTime.setDate(startTime.getDate() - 1);
-        }
-        
-        // Calculate duration between start time and now
-        const durationFormatted = formatDistance(startTime, now, { includeSeconds: false });
-        setDisplayDuration(durationFormatted);
-      }, 30000); // Update every 30 seconds
-      
-      return () => clearInterval(updateInterval);
-    } else {
-      // For completed signals, use the provided duration
-      setDisplayDuration(duration || '');
-    }
-  }, [isActiveSignal, status, timestamp, endTimestamp, duration]);
-  
-  // Helper to parse HH:MM:SS into a Date object
-  const parseTimeString = (timeStr: string): Date => {
-    const now = new Date();
-    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
-    
-    // Create date object with today's date but using the time from the string
-    const date = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      hours,
-      minutes,
-      seconds || 0
-    );
-    
-    return date;
-  };
 
-  const tooltipContent = displayDuration 
-    ? `${status === 1 ? 'Running' : 'Stopped'} from ${timestamp}${endTimestamp ? ` to ${endTimestamp}` : ''} (${displayDuration})`
+  const tooltipContent = duration 
+    ? `${status === 1 ? 'Running' : 'Stopped'} from ${timestamp}${endTimestamp ? ` to ${endTimestamp}` : ''} (${duration})`
     : `${status === 1 ? 'Running' : 'Stopped'} at ${timestamp}`;
 
   return (
     <div
-      className={`absolute top-6 bottom-0 cursor-pointer
+      className={`absolute top-0 bottom-0 cursor-pointer transition-all
         ${isSelected ? 'z-10' : 'z-0'}`}
       style={{
         left: `${position}%`,
@@ -116,14 +69,14 @@ export function TimelineSignal({
         boxShadow: isSelected
           ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(0,0,0,0.1)'
           : '0 0 0 1px rgba(255,255,255,0.7)',
-        transition: isActiveSignal && status === 1 ? 'none' : 'all 0.2s ease',
+        transition: isActiveSignal ? 'width 1s linear' : undefined,
       }}
       onClick={onClick}
       title={tooltipContent}
     >
       {currentWidth > 5 && (
         <div className="absolute inset-0 px-2 text-xs text-white flex items-center overflow-hidden whitespace-nowrap">
-          {displayDuration && currentWidth > 10 ? displayDuration : ''}
+          {duration && currentWidth > 10 ? duration : ''}
         </div>
       )}
     </div>
