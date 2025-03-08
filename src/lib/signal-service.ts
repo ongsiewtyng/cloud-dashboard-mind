@@ -24,19 +24,23 @@ const getTodayDateString = () => {
 
 // Add a new signal log to Firebase
 export const addSignalLog = async (
-  machineId: string, 
-  status: "0" | "1", 
-  timestamp: string, 
-  reason: string = ""
+    machineId: string,
+    status: "0" | "1",
+    timestamp: string,
+    endTimestamp?: string,
+    duration?: string,
+    reason: string = ""
 ): Promise<SignalLog | null> => {
   try {
+    console.log("addSignalLog called with:", { machineId, status, timestamp, reason });
+
     // Check for duplicate logs
     const exists = await checkForDuplicateLog(machineId, status, timestamp);
     if (exists) {
       console.log("Duplicate log detected, not adding to Firebase");
       return null;
     }
-    
+
     // Create new log entry
     const newLogRef = push(signalLogsRef);
     const date = getTodayDateString();
@@ -45,17 +49,19 @@ export const addSignalLog = async (
       machineId,
       status,
       timestamp,
+      endTimestamp,
+      duration,
       reason: status === "0" ? reason : "",
       date
     };
-    
+
     // Save to Firebase
     await set(newLogRef, newLog);
     console.log("Signal log added to Firebase:", newLog);
-    
+
     // Update the previous log's end time and duration if this is a status change
     await updatePreviousLog(machineId, status, timestamp);
-    
+
     return newLog;
   } catch (error) {
     console.error("Error adding signal log:", error);
@@ -108,66 +114,77 @@ const checkForDuplicateLog = async (
 };
 
 // Update previous log with end time and duration
+// Update previous log with end time and duration
 const updatePreviousLog = async (
-  machineId: string,
-  newStatus: "0" | "1",
-  currentTimestamp: string
+    machineId: string,
+    newStatus: "0" | "1",
+    currentTimestamp: string
 ): Promise<void> => {
   try {
     // Get the most recent log for this machine
     const logsQuery = query(
-      signalLogsRef,
-      orderByChild("machineId"),
-      equalTo(machineId)
+        signalLogsRef,
+        orderByChild("machineId"),
+        equalTo(machineId)
     );
-    
+
     const snapshot = await get(logsQuery);
-    if (!snapshot.exists()) return;
-    
+    if (!snapshot.exists()) {
+      console.log("No logs found for machineId:", machineId);
+      return;
+    }
+
     let mostRecentLog: SignalLog | null = null;
     let mostRecentKey = "";
     let mostRecentTime = 0;
-    
+
     // Find the most recent log
     snapshot.forEach((childSnapshot) => {
       const log = childSnapshot.val() as SignalLog;
       const logTime = new Date(`1970-01-01T${log.timestamp}Z`).getTime();
-      
+
       if (!mostRecentLog || logTime > mostRecentTime) {
         mostRecentLog = log;
         mostRecentKey = childSnapshot.key as string;
         mostRecentTime = logTime;
       }
     });
-    
+
+    if (!mostRecentLog) {
+      console.log("No recent log found for machineId:", machineId);
+      return;
+    }
+
     // If we found a log and its status is different from the new one
-    if (mostRecentLog && mostRecentLog.status !== newStatus) {
+    if (mostRecentLog.status !== newStatus) {
       // Calculate duration
       const startDate = new Date(`1970-01-01T${mostRecentLog.timestamp}Z`);
       const endDate = new Date(`1970-01-01T${currentTimestamp}Z`);
-      
+
       // If end time is before start time, assume it's the next day
       if (endDate.getTime() < startDate.getTime()) {
         endDate.setDate(endDate.getDate() + 1);
       }
-      
+
       const diffMs = endDate.getTime() - startDate.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMins / 60);
       const remainingMins = diffMins % 60;
-      
-      const duration = diffHours > 0 
-        ? `${diffHours}h ${remainingMins}m` 
-        : `${remainingMins}m`;
-      
+
+      const duration = diffHours > 0
+          ? `${diffHours}h ${remainingMins}m`
+          : `${remainingMins}m`;
+
       // Update the log
       await set(ref(db, `signalLogs/${mostRecentKey}`), {
         ...mostRecentLog,
         endTimestamp: currentTimestamp,
         duration
       });
-      
+
       console.log("Updated previous log with end time and duration:", mostRecentKey);
+    } else {
+      console.log("Most recent log status is the same as new status, no update needed.");
     }
   } catch (error) {
     console.error("Error updating previous log:", error);
