@@ -266,7 +266,7 @@ export function TimelineChart({timelineData}: TimelineChartProps) {
                     onMouseLeave={handleMouseLeave}
                 >
                     <div
-                        className="absolute top-8 left-0 h-full w-full"
+                        className="absolute top-4 left-0 h-full w-full"
                         style={{
                             width: `${100 * zoomLevel}%`,
                             transform: `translateX(-${panOffset}px)`,

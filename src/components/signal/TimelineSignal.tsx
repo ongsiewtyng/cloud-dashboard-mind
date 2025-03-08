@@ -107,7 +107,7 @@ export function TimelineSignal({
 
   return (
     <div
-      className={`absolute top-0 bottom-0 cursor-pointer
+      className={`absolute top-6 bottom-0 cursor-pointer
         ${isSelected ? 'z-10' : 'z-0'}`}
       style={{
         left: `${position}%`,
