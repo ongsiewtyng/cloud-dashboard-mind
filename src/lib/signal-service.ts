@@ -23,18 +23,86 @@ const getTodayDateString = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-// Add a new signal log to Firebase
+// Check if time is between 8 AM and 5 PM
+const isWithinWorkingHours = (date: Date): boolean => {
+  const hours = date.getHours();
+  return hours >= 8 && hours < 17;
+};
+
+// Initialize daily logs at 8 AM
+export const initializeDailyLogs = async (machineId: string) => {
+  try {
+    const today = getTodayDateString();
+    const logsRef = ref(db, `signalLogs/${machineId}`);
+    
+    // Check if we already have logs for today
+    const snapshot = await get(logsRef);
+    const existingLogs = snapshot.val() || {};
+    
+    const hasLogsForToday = Object.values(existingLogs).some(
+      (log: SignalLog) => log.date === today
+    );
+
+    if (!hasLogsForToday) {
+      // Create initial log for 8 AM
+      const initialLog = {
+        machineId,
+        status: "1", // Assume machine starts in running state
+        timestamp: "08:00",
+        date: today,
+        reason: ""
+      };
+
+      const newLogRef = push(logsRef);
+      await set(newLogRef, initialLog);
+      console.log("Initialized daily logs for:", machineId);
+    }
+  } catch (error) {
+    console.error("Error initializing daily logs:", error);
+  }
+};
+
+// Clean up old logs
+export const cleanupOldLogs = async (machineId: string) => {
+  try {
+    const logsRef = ref(db, `signalLogs/${machineId}`);
+    const snapshot = await get(logsRef);
+    const logs = snapshot.val() || {};
+    
+    const today = getTodayDateString();
+    const cleanedLogs = Object.fromEntries(
+      Object.entries(logs).filter(([key, value]) => (value as SignalLog).date === today)
+    );
+
+    await set(logsRef, cleanedLogs);
+    console.log("Cleaned up old logs for:", machineId);
+  } catch (error) {
+    console.error("Error cleaning up old logs:", error);
+  }
+};
+
+// Modified addSignalLog to prevent duplicate timestamps
 export const addSignalLog = async (
-    machineId: string,
-    status: "0" | "1",
-    timestamp: string,
-    reason: string = ""
+  machineId: string,
+  status: "0" | "1",
+  timestamp: string,
+  reason: string = ""
 ): Promise<SignalLog | null> => {
   try {
     console.log("addSignalLog called with:", { machineId, status, timestamp, reason });
 
-    // Check for duplicate logs
-    const exists = await checkForDuplicateLog(machineId, status, timestamp);
+    // Only allow logs during working hours
+    const [hours, minutes] = timestamp.split(':').map(Number);
+    const logTime = new Date();
+    logTime.setHours(hours, minutes);
+    
+    if (!isWithinWorkingHours(logTime)) {
+      console.log("Log rejected: Outside working hours");
+      return null;
+    }
+
+    // Check for duplicate timestamps
+    const exists = await checkForDuplicateLog(machineId, timestamp);
     if (exists) {
       console.log("Duplicate log detected, not adding to Firebase");
       return null;
@@ -42,19 +110,16 @@ export const addSignalLog = async (
 
     // Find previous log to calculate endTimestamp and duration
     const previousLog = await getLatestLogForMachine(machineId);
-    let endTimestamp;
-    let duration;
-
+    
     // Create new log entry
     const newLogRef = push(ref(db, `signalLogs/${machineId}`));
     const date = getTodayDateString();
+    
     const newLog: SignalLog = {
       id: newLogRef.key || "",
       machineId,
       status,
       timestamp,
-      endTimestamp,
-      duration,
       reason: status === "0" ? reason : "",
       date
     };
@@ -63,7 +128,7 @@ export const addSignalLog = async (
     await set(newLogRef, newLog);
     console.log("Signal log added to Firebase:", newLog);
 
-    // Update the previous log's end time and duration if this is a status change
+    // Update the previous log's end time and duration
     if (previousLog && previousLog.status !== status) {
       await updateLogEndTimeAndDuration(previousLog, timestamp);
     }
@@ -72,6 +137,51 @@ export const addSignalLog = async (
   } catch (error) {
     console.error("Error adding signal log:", error);
     return null;
+  }
+};
+
+// Modified checkForDuplicateLog to check exact timestamp
+const checkForDuplicateLog = async (
+  machineId: string,
+  timestamp: string
+): Promise<boolean> => {
+  try {
+    const today = getTodayDateString();
+    const logsRef = ref(db, `signalLogs/${machineId}`);
+    const snapshot = await get(logsRef);
+    
+    if (!snapshot.exists()) return false;
+
+    const logs = Object.values(snapshot.val()) as SignalLog[];
+    return logs.some(log => 
+      log.date === today && log.timestamp === timestamp
+    );
+  } catch (error) {
+    console.error("Error checking for duplicate log:", error);
+    return false;
+  }
+};
+
+// Add a background service initializer
+export const initializeBackgroundService = (machineId: string) => {
+  // Check and initialize logs every day at 8 AM
+  const checkAndInitialize = async () => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    if (hours === 8 && minutes === 0) {
+      await cleanupOldLogs(machineId);
+      await initializeDailyLogs(machineId);
+    }
+  };
+
+  // Run every minute to check for 8 AM
+  setInterval(checkAndInitialize, 60000);
+
+  // Also run immediately if we're loading during working hours
+  if (isWithinWorkingHours(new Date())) {
+    checkAndInitialize();
   }
 };
 
@@ -137,62 +247,38 @@ export const getLatestLogForMachine = async (machineId: string): Promise<SignalL
   }
 };
 
-// Check if a similar log exists at the same timestamp
-const checkForDuplicateLog = async (
-    machineId: string,
-    status: "0" | "1",
-    timestamp: string
-): Promise<boolean> => {
-  try {
-    // Get recent logs for this machine
-    const recentLogsQuery = ref(db, `signalLogs/${machineId}`);
-
-    const snapshot = await get(recentLogsQuery);
-    if (!snapshot.exists()) return false;
-
-    // Convert timestamp to date object for comparison
-    const newLogTime = new Date(`1970-01-01T${timestamp}Z`).getTime();
-
-    // Check for duplicate or conflicting logs
-    let isDuplicate = false;
-    snapshot.forEach((childSnapshot) => {
-      const log = childSnapshot.val() as SignalLog;
-
-      // Only check recent logs (within the last minute)
-      const logTime = new Date(`1970-01-01T${log.timestamp}Z`).getTime();
-      const timeDiff = Math.abs(newLogTime - logTime);
-
-      if (timeDiff < 1000) { // Within 1 second
-        if (log.status === status) {
-          isDuplicate = true;
-          return true; // Break the forEach loop
-        }
-      }
-    });
-
-    return isDuplicate;
-  } catch (error) {
-    console.error("Error checking for duplicate log:", error);
-    return false;
-  }
-};
-
 // Get logs for a specific machine and date
 export async function getSignalLogs(machineID: string) {
   const db = getDatabase();
-  const logsRef = ref(db, `signalLogs/${machineID}`); // Get logs for specific machine
+  const logsRef = ref(db, `signalLogs/${machineID}`);
 
   try {
     const snapshot = await get(logsRef);
+    
     if (snapshot.exists()) {
-      const data = snapshot.val(); // Get raw data
-      const logsArray = Object.values(data); // Convert to an array
-      console.log("Fetched Logs:", logsArray); // Log result
+      const data = snapshot.val();
+      
+      // Convert the nested object structure to array
+      const logsArray = Object.entries(data).map(([key, value]: [string, SignalLog]) => ({
+        id: key,
+        ...value,
+        machineId: machineID,
+        status: value.status || "0",
+        timestamp: value.timestamp || "",
+        reason: value.reason || ""
+      }));
+
+      // Sort by timestamp, newest first
+      logsArray.sort((a, b) => {
+        const aTime = new Date(`1970-01-01T${a.timestamp}`).getTime();
+        const bTime = new Date(`1970-01-01T${b.timestamp}`).getTime();
+        return bTime - aTime;
+      });
+
       return logsArray;
-    } else {
-      console.log("No logs available for this machine.");
-      return [];
     }
+    console.log('No logs found for machine:', machineID);
+    return [];
   } catch (error) {
     console.error("Error fetching signal logs:", error);
     return [];

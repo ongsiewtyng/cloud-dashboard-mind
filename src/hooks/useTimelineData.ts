@@ -1,64 +1,52 @@
-
 import { useMemo } from "react";
+import { type SignalLog } from '@/lib/signal-service';
 import { calculateNormalizedPosition } from "@/utils/timelineUtils";
 
-interface SignalLog {
-  id: string;
-  machineId: string;
-  status: "0" | "1";
-  timestamp: string;
-  endTimestamp?: string;
-  duration?: string;
-  reason: string;
-}
+export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
+  return useMemo(() => {
+    if (!signalLogs?.length) {
+      console.log('No signal logs available for timeline');
+      return [];
+    }
 
-export function useTimelineData(
-  signalLogs: SignalLog[], 
-  machineId: string,
-  startTime: string = "08:00",
-  endTime: string = "17:00"
-) {
-  const timelineData = useMemo(() => {
-    // Filter logs for the selected machine
-    const filteredLogs = signalLogs.filter(log => log.machineId === machineId);
-    
-    if (!filteredLogs.length) return [];
-    
-    // Create enhanced timeline data with position and width calculations
-    const enhancedData = filteredLogs.map((log, index, array) => {
+    // Debug the incoming data
+    console.log('Processing logs for timeline:', signalLogs.map(log => ({
+      status: log.status,
+      timestamp: log.timestamp,
+      endTimestamp: log.endTimestamp
+    })));
+
+    // Sort logs by timestamp
+    const sortedLogs = [...signalLogs].sort((a, b) => {
+      const aTime = new Date(`1970-01-01T${a.timestamp}`).getTime();
+      const bTime = new Date(`1970-01-01T${b.timestamp}`).getTime();
+      return aTime - bTime;
+    });
+
+    const timelinePoints = sortedLogs.map((log, index) => {
       // Calculate position based on timestamp
-      const position = calculateNormalizedPosition(log.timestamp, startTime, endTime) * 100;
-      
-      // Calculate width if we have duration information
-      let width = 0.5; // Default narrow width
-      
+      const position = calculateNormalizedPosition(log.timestamp, "08:00", "17:00") * 100;
+
+      // Calculate width based on duration or next log
+      let width = 0;
       if (log.endTimestamp) {
-        const endPosition = calculateNormalizedPosition(log.endTimestamp, startTime, endTime) * 100;
+        const endPosition = calculateNormalizedPosition(log.endTimestamp, "08:00", "17:00") * 100;
         width = Math.max(0.5, endPosition - position);
-      } else if (index < array.length - 1 && array[index + 1].status !== log.status) {
-        // If this log doesn't have an endTimestamp but there's a next log with different status,
-        // use the next log's timestamp as this log's end
-        const nextLogPos = calculateNormalizedPosition(array[index + 1].timestamp, startTime, endTime) * 100;
-        width = Math.max(0.5, nextLogPos - position);
-      } else if (log.status === "1") {
-        // For running logs without end time, extend to the current time or to the end of the timeline
-        const now = new Date();
-        const hours = now.getHours().toString().padStart(2, '0');
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        const seconds = now.getSeconds().toString().padStart(2, '0');
-        const currentTime = `${hours}:${minutes}:${seconds}`;
-        
-        const currentPosition = calculateNormalizedPosition(currentTime, startTime, endTime) * 100;
-        
-        // Only extend if current time is after the log time
-        if (currentPosition > position) {
-          width = Math.max(0.5, currentPosition - position);
-        }
+      } else if (index < sortedLogs.length - 1) {
+        // If no endTimestamp, use next log's timestamp
+        const nextPosition = calculateNormalizedPosition(sortedLogs[index + 1].timestamp, "08:00", "17:00") * 100;
+        width = Math.max(0.5, nextPosition - position);
+      } else {
+        // For the last log without endTimestamp, set a default width
+        width = 2;
       }
-      
-      return {
+
+      // Ensure status is treated as a number
+      const numericStatus = typeof log.status === 'string' ? parseInt(log.status) : log.status;
+
+      const point = {
         id: log.id,
-        status: Number(log.status),
+        status: numericStatus,
         position,
         width,
         timestamp: log.timestamp,
@@ -66,11 +54,16 @@ export function useTimelineData(
         duration: log.duration,
         reason: log.reason
       };
-    });
-    
-    // Sort by timestamp
-    return enhancedData.sort((a, b) => a.position - b.position);
-  }, [signalLogs, machineId, startTime, endTime]);
 
-  return timelineData;
+      // Debug each point
+      console.log('Created timeline point:', point);
+
+      return point;
+    });
+
+    // Debug final timeline data
+    console.log('Final timeline points:', timelinePoints);
+
+    return timelinePoints;
+  }, [signalLogs, machineId]);
 }

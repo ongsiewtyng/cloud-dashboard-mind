@@ -27,7 +27,8 @@ export function LogsTable({ machineId, onUpdateReason }: LogsTableProps) {
       setLoading(true);
       try {
         const fetchedLogs = await getSignalLogs(machineId);
-        setLogs(fetchedLogs as SignalLog[]);
+        console.log('Fetched logs in LogsTable:', fetchedLogs);
+        setLogs(fetchedLogs);
       } catch (error) {
         console.error("Failed to fetch signal logs:", error);
       }
@@ -136,7 +137,7 @@ export function LogsTable({ machineId, onUpdateReason }: LogsTableProps) {
                       <tr key={log.id} className="border-b hover:bg-slate-50">
                         <td className="py-3 px-4 text-sm">{formatTime(log.timestamp)}</td>
                         <td className="py-3 px-4">
-                          <Badge className={`${log.status === "1" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                          <Badge className={`${log.status === "1" ? "!bg-green-100 !text-green-800" : "!bg-red-100 !text-red-800"}`}>
                             {log.status === "1" ? "Running" : "Down"}
                           </Badge>
                         </td>
