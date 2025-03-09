@@ -27,7 +27,7 @@ export function LogsTable({ machineId, onUpdateReason }: LogsTableProps) {
       setLoading(true);
       try {
         const fetchedLogs = await getSignalLogs(machineId);
-        setLogs(fetchedLogs);
+        setLogs(fetchedLogs as SignalLog[]);
       } catch (error) {
         console.error("Failed to fetch signal logs:", error);
       }
