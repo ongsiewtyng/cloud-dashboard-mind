@@ -13,10 +13,32 @@ export function useSignalSimulation(selectedMachine: string | null) {
   const [newLogReason, setNewLogReason] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
   const [lastStatus, setLastStatus] = useState<"0" | "1">("1");
+  const [lastSimulationTime, setLastSimulationTime] = useState<number | null>(null);
+  const [runningTimeStart, setRunningTimeStart] = useState<number | null>(null);
+  const [lastDowntimeStart, setLastDowntimeStart] = useState<number | null>(null);
 
   // Timeline boundaries (8 AM to 5 PM)
   const startTime = "08:00";
   const endTime = "17:00";
+
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && lastSimulationTime) {
+        const now = Date.now();
+        const timeSinceLastSimulation = now - lastSimulationTime;
+        
+        // If more than 1 minute has passed, catch up on missed simulations
+        if (timeSinceLastSimulation > 60000 && selectedMachine && isSimulating) {
+          console.log(`Catching up on ${Math.floor(timeSinceLastSimulation / 60000)} minutes of missed simulation`);
+          runSimulation(selectedMachine, lastStatus);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [lastSimulationTime, selectedMachine, isSimulating, lastStatus]);
 
   // Subscribe to real-time signal logs when a machine is selected
   useEffect(() => {
@@ -122,75 +144,66 @@ export function useSignalSimulation(selectedMachine: string | null) {
     return false;
   };
 
-  // Simulation effect
-  useEffect(() => {
-    let simulationInterval: number | null = null;
-    let lastDowntimeStart: number | null = null;
-    let runningTimeStart: number | null = null;
+  // Simulation logic extracted to a separate function
+  const runSimulation = async (machineId: string, currentStatus: "0" | "1") => {
+    if (!isWithinTimelineBounds()) return;
 
+    let randomStatus: "0" | "1";
+    const now = Date.now();
+    setLastSimulationTime(now);
+
+    if (currentStatus === "1") {
+      const minutesRunning = runningTimeStart ? 
+        Math.floor((now - runningTimeStart) / 60000) : 0;
+      
+      const downChance = Math.min(0.3, 0.05 + (Math.floor(minutesRunning / 5) * 0.01));
+      randomStatus = Math.random() < downChance ? "0" : "1";
+      
+      if (randomStatus === "0") {
+        setLastDowntimeStart(now);
+        setRunningTimeStart(null);
+        console.log(`Machine going down after running for ${minutesRunning} minutes`);
+      }
+    } else {
+      const minutesDown = lastDowntimeStart ? 
+        Math.floor((now - lastDowntimeStart) / 60000) : 0;
+      
+      const recoveryChance = Math.min(0.9, 0.2 * (minutesDown + 1));
+      randomStatus = Math.random() < recoveryChance ? "1" : "0";
+      
+      if (randomStatus === "1") {
+        console.log(`Machine recovered after ${minutesDown} minutes`);
+        setLastDowntimeStart(null);
+        setRunningTimeStart(now);
+      }
+    }
+
+    if (randomStatus !== currentStatus) {
+      const reason = randomStatus === "0" ? getRandomDowntimeReason() : "";
+      await addSignalLogToService(machineId, randomStatus, reason);
+      console.log("Status changed and logged:", randomStatus);
+    }
+  };
+
+  // Simulation effect with background support
+  useEffect(() => {
     if (isSimulating && selectedMachine) {
       console.log("Starting real-time simulation for machine:", selectedMachine);
       
-      // Initialize running time start if we're starting in running state
       if (lastStatus === "1") {
-        runningTimeStart = Date.now();
+        setRunningTimeStart(Date.now());
       }
 
-      simulationInterval = window.setInterval(async () => {
-        if (isWithinTimelineBounds()) {
-          let randomStatus: "0" | "1";
-          
-          if (lastStatus === "1") {
-            // Calculate how long we've been running
-            const minutesRunning = runningTimeStart ? 
-              Math.floor((Date.now() - runningTimeStart) / 60000) : 0;
-            
-            // Probability of going down increases slightly with running time
-            // Base chance is 5% per minute, increasing by 1% every 5 minutes
-            const downChance = Math.min(0.3, 0.05 + (Math.floor(minutesRunning / 5) * 0.01));
-            randomStatus = Math.random() < downChance ? "0" : "1";
-            
-            if (randomStatus === "0") {
-              // If we're going down, record the time and reset running time
-              lastDowntimeStart = Date.now();
-              runningTimeStart = null;
-              console.log(`Machine going down after running for ${minutesRunning} minutes`);
-            }
-          } else {
-            // When down, calculate how long we've been down
-            const minutesDown = lastDowntimeStart ? 
-              Math.floor((Date.now() - lastDowntimeStart) / 60000) : 0;
-            
-            // Recovery chance increases by 20% each minute, max 90%
-            const recoveryChance = Math.min(0.9, 0.2 * (minutesDown + 1));
-            randomStatus = Math.random() < recoveryChance ? "1" : "0";
-            
-            console.log(`Minutes down: ${minutesDown}, Recovery chance: ${(recoveryChance * 100).toFixed(1)}%`);
-            
-            // If we recover, reset downtime start and record running start
-            if (randomStatus === "1") {
-              console.log(`Machine recovered after ${minutesDown} minutes`);
-              lastDowntimeStart = null;
-              runningTimeStart = Date.now();
-            }
-          }
+      const simulationInterval = window.setInterval(() => {
+        runSimulation(selectedMachine, lastStatus);
+      }, 60000);
 
-          if (randomStatus !== lastStatus) {
-            const reason = randomStatus === "0" ? getRandomDowntimeReason() : "";
-            await addSignalLogToService(selectedMachine, randomStatus, reason);
-            console.log("Status changed and logged:", randomStatus);
-          }
-        }
-      }, 60000); // Check every minute
-    }
-
-    return () => {
-      if (simulationInterval) {
+      return () => {
         console.log("Stopping simulation");
         clearInterval(simulationInterval);
-      }
-    };
-  }, [isSimulating, selectedMachine, lastStatus, signalLogs]);
+      };
+    }
+  }, [isSimulating, selectedMachine, lastStatus]);
 
   // Update a log's reason
   const updateLogReason = async (logId: string, reason: string) => {
