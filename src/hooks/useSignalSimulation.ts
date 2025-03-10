@@ -49,7 +49,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
     }
 
     let isInitialized = false;
-    console.log("Subscribing to signal logs for machine:", selectedMachine);
+    console.log("Subscribing to signal logs for machines:", selectedMachine);
     
     const unsubscribe = subscribeToSignalLogs(selectedMachine, async (logs) => {
       setSignalLogs(logs);
