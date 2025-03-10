@@ -15,7 +15,6 @@ export interface SignalLog {
 
 // Firebase references
 const signalLogsRef = ref(db, "signalLogs");
-console.log(signalLogsRef);
 
 // Get today's date string in YYYY-MM-DD format for data partitioning
 const getTodayDateString = () => {
@@ -101,16 +100,21 @@ export const addSignalLog = async (
       return null;
     }
 
-    // Check for duplicate timestamps
-    const exists = await checkForDuplicateLog(machineId, timestamp);
-    if (exists) {
-      console.log("Duplicate log detected, not adding to Firebase");
-      return null;
+    // Get the latest log to check timestamp
+    const latestLog = await getLatestLogForMachine(machineId);
+    let finalTimestamp = timestamp;
+
+    // If the latest log has the same HH:MM, add seconds to make it unique
+    if (latestLog && latestLog.timestamp.startsWith(timestamp)) {
+      const [latestHours, latestMinutes, latestSeconds = "00"] = latestLog.timestamp.split(':');
+      const seconds = (parseInt(latestSeconds) + 1).toString().padStart(2, '0');
+      finalTimestamp = `${timestamp}:${seconds}`;
+      console.log("Adjusted timestamp to avoid duplicate:", finalTimestamp);
+    } else if (!timestamp.includes(':')) {
+      // If no seconds provided, add :00
+      finalTimestamp = `${timestamp}:00`;
     }
 
-    // Find previous log to calculate endTimestamp and duration
-    const previousLog = await getLatestLogForMachine(machineId);
-    
     // Create new log entry
     const newLogRef = push(ref(db, `signalLogs/${machineId}`));
     const date = getTodayDateString();
@@ -119,7 +123,7 @@ export const addSignalLog = async (
       id: newLogRef.key || "",
       machineId,
       status,
-      timestamp,
+      timestamp: finalTimestamp,
       reason: status === "0" ? reason : "",
       date
     };
@@ -129,8 +133,8 @@ export const addSignalLog = async (
     console.log("Signal log added to Firebase:", newLog);
 
     // Update the previous log's end time and duration
-    if (previousLog && previousLog.status !== status) {
-      await updateLogEndTimeAndDuration(previousLog, timestamp);
+    if (latestLog && latestLog.status !== status) {
+      await updateLogEndTimeAndDuration(latestLog, finalTimestamp);
     }
 
     return newLog;

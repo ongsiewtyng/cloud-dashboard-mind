@@ -26,20 +26,36 @@ export function useSignalSimulation(selectedMachine: string | null) {
       return;
     }
 
+    let isInitialized = false;
     console.log("Subscribing to signal logs for machine:", selectedMachine);
-    const unsubscribe = subscribeToSignalLogs(selectedMachine, (logs) => {
+    
+    const unsubscribe = subscribeToSignalLogs(selectedMachine, async (logs) => {
       setSignalLogs(logs);
+      
       // Set last status based on most recent log
       if (logs.length > 0) {
         setLastStatus(logs[0].status);
+      }
+
+      // Only try to initialize once when we first get the logs
+      if (!isInitialized && isWithinTimelineBounds()) {
+        isInitialized = true;
+        const today = new Date().toISOString().split('T')[0];
+        const hasLogsForToday = logs.some(log => log.date === today);
+        
+        if (!hasLogsForToday) {
+          console.log("No logs found for today, initializing...");
+          const initialStatus = Math.random() > 0.05 ? "1" : "0";
+          const reason = initialStatus === "0" ? getRandomDowntimeReason() : "";
+          await addSignalLogToService(selectedMachine, initialStatus, reason);
+        } else {
+          console.log("Found existing logs for today, skipping initialization");
+        }
       }
     });
 
     // Start simulation
     setIsSimulating(true);
-
-    // Update all log durations when first loading logs for a machine
-    updateAllLogDurations(selectedMachine);
 
     return () => {
       console.log("Unsubscribing from signal logs");
@@ -67,14 +83,28 @@ export function useSignalSimulation(selectedMachine: string | null) {
   const addSignalLogToService = async (machineId: string, status: "0" | "1", autoReason?: string) => {
     if (!machineId) return false;
 
+    // Format timestamp in HH:MM:SS format
+    const timestamp = getCurrentTimeString();
+    
+    // Extract HH:MM from timestamp
+    const timeMinute = timestamp.substring(0, 5);
+    
+    // Check if we already have a log in this minute
+    const existingLogInMinute = signalLogs.find(log => {
+      const logMinute = log.timestamp.substring(0, 5);
+      return logMinute === timeMinute;
+    });
+
+    if (existingLogInMinute) {
+      console.log("Skipping duplicate log in same minute:", timeMinute);
+      return false;
+    }
+
     let reason = status === "1" ? "" : newLogReason;
 
     if (autoReason && status === "0") {
       reason = autoReason;
     }
-
-    // Format timestamp in HH:MM:SS format
-    const timestamp = getCurrentTimeString();
 
     // Add log to Firebase
     const result = await addSignalLog(machineId, status, timestamp, reason);
@@ -92,47 +122,66 @@ export function useSignalSimulation(selectedMachine: string | null) {
     return false;
   };
 
-  // In `src/hooks/useSignalSimulation.ts`
+  // Simulation effect
   useEffect(() => {
     let simulationInterval: number | null = null;
+    let lastDowntimeStart: number | null = null;
+    let runningTimeStart: number | null = null;
 
     if (isSimulating && selectedMachine) {
       console.log("Starting real-time simulation for machine:", selectedMachine);
+      
+      // Initialize running time start if we're starting in running state
+      if (lastStatus === "1") {
+        runningTimeStart = Date.now();
+      }
 
-      // Initial status check based on time of day
-      const checkInitialStatus = async () => {
-        if (isWithinTimelineBounds()) {
-          if (signalLogs.length === 0) {
-            const initialStatus = Math.random() > 0.1 ? "1" : "0";
-            if (initialStatus === "0") {
-              setNewLogReason(getRandomDowntimeReason());
-            }
-            setLastStatus(initialStatus);
-            console.log("Initial status set:", initialStatus);
-          }
-        }
-      };
-
-      checkInitialStatus();
-
-      simulationInterval = window.setInterval(() => {
+      simulationInterval = window.setInterval(async () => {
         if (isWithinTimelineBounds()) {
           let randomStatus: "0" | "1";
+          
           if (lastStatus === "1") {
-            randomStatus = Math.random() < 0.05 ? "0" : "1";
+            // Calculate how long we've been running
+            const minutesRunning = runningTimeStart ? 
+              Math.floor((Date.now() - runningTimeStart) / 60000) : 0;
+            
+            // Probability of going down increases slightly with running time
+            // Base chance is 5% per minute, increasing by 1% every 5 minutes
+            const downChance = Math.min(0.3, 0.05 + (Math.floor(minutesRunning / 5) * 0.01));
+            randomStatus = Math.random() < downChance ? "0" : "1";
+            
+            if (randomStatus === "0") {
+              // If we're going down, record the time and reset running time
+              lastDowntimeStart = Date.now();
+              runningTimeStart = null;
+              console.log(`Machine going down after running for ${minutesRunning} minutes`);
+            }
           } else {
-            randomStatus = Math.random() < 0.8 ? "1" : "0";
+            // When down, calculate how long we've been down
+            const minutesDown = lastDowntimeStart ? 
+              Math.floor((Date.now() - lastDowntimeStart) / 60000) : 0;
+            
+            // Recovery chance increases by 20% each minute, max 90%
+            const recoveryChance = Math.min(0.9, 0.2 * (minutesDown + 1));
+            randomStatus = Math.random() < recoveryChance ? "1" : "0";
+            
+            console.log(`Minutes down: ${minutesDown}, Recovery chance: ${(recoveryChance * 100).toFixed(1)}%`);
+            
+            // If we recover, reset downtime start and record running start
+            if (randomStatus === "1") {
+              console.log(`Machine recovered after ${minutesDown} minutes`);
+              lastDowntimeStart = null;
+              runningTimeStart = Date.now();
+            }
           }
 
           if (randomStatus !== lastStatus) {
-            if (randomStatus === "0") {
-              setNewLogReason(getRandomDowntimeReason());
-            }
-            setLastStatus(randomStatus);
-            console.log("Status changed to:", randomStatus);
+            const reason = randomStatus === "0" ? getRandomDowntimeReason() : "";
+            await addSignalLogToService(selectedMachine, randomStatus, reason);
+            console.log("Status changed and logged:", randomStatus);
           }
         }
-      }, Math.floor(Math.random() * 15000) + 30000);
+      }, 60000); // Check every minute
     }
 
     return () => {
@@ -141,7 +190,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
         clearInterval(simulationInterval);
       }
     };
-  }, [isSimulating, selectedMachine, lastStatus, signalLogs.length]);
+  }, [isSimulating, selectedMachine, lastStatus, signalLogs]);
 
   // Update a log's reason
   const updateLogReason = async (logId: string, reason: string) => {

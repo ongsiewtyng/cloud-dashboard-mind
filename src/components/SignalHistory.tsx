@@ -8,6 +8,7 @@ import { type SignalLog, getSignalLogs } from "@/lib/signal-service";
 
 interface SignalHistoryProps {
   machineId: string;
+  signalLogs: SignalLog[];
   currentStatus: "0" | "1";
   onAddLog: (machineId: string, status: "0" | "1") => void;
   updateLogReason: (logId: string, reason: string) => Promise<boolean>;
@@ -15,30 +16,12 @@ interface SignalHistoryProps {
 
 export function SignalHistory({ 
   machineId, 
+  signalLogs,
   currentStatus, 
   onAddLog,
   updateLogReason
 }: SignalHistoryProps) {
-  const [logs, setLogs] = useState<SignalLog[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-      try {
-        const fetchedLogs = await getSignalLogs(machineId);
-        console.log('SignalHistory fetched logs:', fetchedLogs);
-        setLogs(fetchedLogs);
-      } catch (error) {
-        console.error("Failed to fetch signal logs:", error);
-      }
-      setLoading(false);
-    };
-
-    fetchLogs();
-  }, [machineId]);
-
-  const timelineData = useTimelineData(logs, machineId);
+  const timelineData = useTimelineData(signalLogs, machineId);
 
   return (
     <Card className="shadow-md border-slate-200">
@@ -49,21 +32,16 @@ export function SignalHistory({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 space-y-4">
-        {loading ? (
-          <div className="text-center py-4">Loading timeline...</div>
-        ) : (
-          <>
-            <TimelineChart 
-              timelineData={timelineData} 
-              startTime="08:00"
-              endTime="17:00"
-            />
-            <LogsTable
-              machineId={machineId}
-              onUpdateReason={updateLogReason}
-            />
-          </>
-        )}
+        <TimelineChart 
+          timelineData={timelineData} 
+          startTime="08:00"
+          endTime="17:00"
+        />
+        <LogsTable
+          machineId={machineId}
+          signalLogs={signalLogs}
+          onUpdateReason={updateLogReason}
+        />
       </CardContent>
     </Card>
   );

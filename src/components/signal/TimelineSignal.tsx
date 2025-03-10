@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 interface TimelineSignalProps {
   id: string;
@@ -28,31 +27,51 @@ export function TimelineSignal({
   onClick,
   isActiveSignal = false
 }: TimelineSignalProps) {
-  const [currentWidth, setCurrentWidth] = useState(isActiveSignal ? 0.5 : width);
+  const [currentWidth, setCurrentWidth] = useState(width);
+  const animationFrameRef = useRef<number>();
+  const lastUpdateRef = useRef<number>();
   
   // Effect to animate width for active signals
   useEffect(() => {
-    // If this is a new active signal and it's a "running" signal (status 1), start with minimal width
     if (isActiveSignal && status === 1) {
-      setCurrentWidth(0.5); // Start with minimal width
-      
-      // Set up interval to gradually increase width to match target width
-      const growInterval = setInterval(() => {
-        setCurrentWidth(prev => {
-          if (prev >= width) {
-            clearInterval(growInterval);
-            return width;
-          }
-          return prev + 0.1; // Grow gradually
-        });
-      }, 1000); // Update every second
-      
-      return () => clearInterval(growInterval);
+      // Function to update width based on current time
+      const updateWidth = (timestamp: number) => {
+        if (!lastUpdateRef.current) {
+          lastUpdateRef.current = timestamp;
+        }
+
+        const now = new Date();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        const [hours, minutes, seconds] = currentTime.split(':').map(Number);
+        const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+        
+        // Calculate normalized position (0-100) based on time
+        const startTime = "08:00";
+        const endTime = "17:00";
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+        const startSeconds = startHours * 3600 + startMinutes * 60;
+        const endSeconds = endHours * 3600 + endMinutes * 60;
+        
+        const progress = (totalSeconds - startSeconds) / (endSeconds - startSeconds);
+        const newWidth = Math.max(0.5, (progress * 100) - position);
+        
+        setCurrentWidth(newWidth);
+        animationFrameRef.current = requestAnimationFrame(updateWidth);
+      };
+
+      // Start the animation
+      animationFrameRef.current = requestAnimationFrame(updateWidth);
+
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
     } else {
-      // For non-active signals or status 0, just set to target width
       setCurrentWidth(width);
     }
-  }, [width, isActiveSignal, status]);
+  }, [isActiveSignal, status, position, width]);
 
   const tooltipContent = duration 
     ? `${status === 1 ? 'Running' : 'Stopped'} from ${timestamp}${endTimestamp ? ` to ${endTimestamp}` : ''} (${duration})`
@@ -60,16 +79,18 @@ export function TimelineSignal({
 
   return (
     <div
-      className={`absolute top-0 bottom-0 cursor-pointer transition-all
-        ${isSelected ? 'z-10' : 'z-0'}`}
+      className={`absolute h-12 cursor-pointer transition-all
+        ${isSelected ? 'z-10 scale-105' : 'z-0'}
+        ${status === 1 
+          ? `bg-green-500 ${isSelected ? 'ring-2 ring-green-300' : ''}` 
+          : `bg-red-500 ${isSelected ? 'ring-2 ring-red-300' : ''}`
+        }`}
       style={{
         left: `${position}%`,
-        width: `${currentWidth}%`,  // Use animated width
-        backgroundColor: status === 1 ? '#22c55e' : '#ef4444',
-        boxShadow: isSelected
-          ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(0,0,0,0.1)'
-          : '0 0 0 1px rgba(255,255,255,0.7)',
-        transition: isActiveSignal ? 'width 1s linear' : undefined,
+        width: `${Math.max(currentWidth, 0.5)}%`,
+        minWidth: '2px',
+        bottom: '4px',
+        transition: isSelected ? 'transform 0.2s ease-out' : undefined,
       }}
       onClick={onClick}
       title={tooltipContent}

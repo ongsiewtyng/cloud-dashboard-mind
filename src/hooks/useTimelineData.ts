@@ -16,12 +16,15 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
       endTimestamp: log.endTimestamp
     })));
 
-    // Sort logs by timestamp
-    const sortedLogs = [...signalLogs].sort((a, b) => {
-      const aTime = new Date(`1970-01-01T${a.timestamp}`).getTime();
-      const bTime = new Date(`1970-01-01T${b.timestamp}`).getTime();
-      return aTime - bTime;
-    });
+    // Sort logs by timestamp in descending order (newest first)
+    const sortedLogs = [...signalLogs].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    // Get current time for calculating active signal width
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const currentPosition = calculateNormalizedPosition(currentTime, "08:00", "17:00") * 100;
 
     const timelinePoints = sortedLogs.map((log, index) => {
       // Calculate position based on timestamp
@@ -29,6 +32,8 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
 
       // Calculate width based on duration or next log
       let width = 0;
+      let isActiveSignal = false;
+
       if (log.endTimestamp) {
         const endPosition = calculateNormalizedPosition(log.endTimestamp, "08:00", "17:00") * 100;
         width = Math.max(0.5, endPosition - position);
@@ -37,8 +42,9 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         const nextPosition = calculateNormalizedPosition(sortedLogs[index + 1].timestamp, "08:00", "17:00") * 100;
         width = Math.max(0.5, nextPosition - position);
       } else {
-        // For the last log without endTimestamp, set a default width
-        width = 2;
+        // For the last log without endTimestamp, calculate width up to current time
+        width = Math.max(0.5, currentPosition - position);
+        isActiveSignal = true; // This is the active signal
       }
 
       // Ensure status is treated as a number
@@ -52,7 +58,8 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         timestamp: log.timestamp,
         endTimestamp: log.endTimestamp,
         duration: log.duration,
-        reason: log.reason
+        reason: log.reason,
+        isActiveSignal // Add this flag to identify the active signal
       };
 
       // Debug each point

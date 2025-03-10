@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Clock, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { generateHourlyLabels, calculateNormalizedPosition } from "@/utils/timelineUtils";
 import { Button } from "@/components/ui/button";
+import { TimelineSignal } from "./TimelineSignal";
 
 interface TimelineDataPoint {
     id: string;
@@ -13,6 +14,7 @@ interface TimelineDataPoint {
     endTimestamp?: string;
     duration?: string;
     reason: string;
+    isActiveSignal?: boolean;
 }
 
 interface TimelineChartProps {
@@ -356,36 +358,25 @@ export function TimelineChart({
                     )}
 
                     {/* Signal bars */}
-                    {timelineData.map((signal) => {
-                        const isHovered = hoveredSignal === signal.id;
-                        return (
-                            <motion.div
-                                key={signal.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ 
-                                    opacity: 1, 
-                                    y: 0,
-                                    height: isHovered ? 32 : 28, // Slightly taller when hovered
-                                    scale: isHovered ? 1.03 : 1  // Slightly larger when hovered
-                                }}
-                                transition={{ duration: 0.2 }}
-                                className={`absolute bottom-1 transition-all cursor-pointer ${
-                                    signal.status === 1 
-                                        ? `bg-green-500 ${isHovered ? 'ring-2 ring-green-300' : ''}` 
-                                        : `bg-red-500 ${isHovered ? 'ring-2 ring-red-300' : ''}`
-                                }`}
-                                style={{
-                                    left: `${signal.position}%`,
-                                    width: `${Math.max(signal.width, 0.5)}%`,
-                                    minWidth: '2px',
-                                    zIndex: isHovered ? 10 : (signal.status === 0 ? 2 : 1)
-                                }}
-                                onMouseEnter={(e) => handleSignalMouseEnter(e, signal)}
-                                onMouseMove={handleSignalMouseMove}
-                                onMouseLeave={handleSignalMouseLeave}
-                            />
-                        );
-                    })}
+                    {timelineData.map((signal) => (
+                        <TimelineSignal
+                            key={signal.id}
+                            id={signal.id}
+                            position={signal.position}
+                            width={signal.width}
+                            status={signal.status}
+                            timestamp={signal.timestamp}
+                            endTimestamp={signal.endTimestamp}
+                            duration={signal.duration}
+                            reason={signal.reason}
+                            isSelected={hoveredSignal === signal.id}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleSignalMouseEnter(e, signal);
+                            }}
+                            isActiveSignal={signal.isActiveSignal}
+                        />
+                    ))}
                 </div>
             </div>
             

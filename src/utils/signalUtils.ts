@@ -1,23 +1,22 @@
-
 // Helper function to calculate time difference for duration display
 export const getTimeDifference = (start: string, end: string): string => {
-  const startDate = new Date(`1970-01-01T${start}Z`);
-  const endDate = new Date(`1970-01-01T${end}Z`);
+  const [startHours, startMinutes] = start.split(":").map(Number);
+  const [endHours, endMinutes] = end.split(":").map(Number);
   
-  // If end time is before start time, assume it's the next day
-  if (endDate < startDate) {
-    endDate.setDate(endDate.getDate() + 1);
+  let totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+  
+  // If end time is before start time, assume it's within the same day (8 AM - 5 PM window)
+  if (totalMinutes < 0) {
+    totalMinutes += 24 * 60; // Add a full day of minutes
   }
   
-  const diffMs = endDate.getTime() - startDate.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const remainingMins = diffMins % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
   
-  if (diffHours > 0) {
-    return `${diffHours}h ${remainingMins}m`;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
   } else {
-    return `${remainingMins}m`;
+    return `${minutes}m`;
   }
 };
 
