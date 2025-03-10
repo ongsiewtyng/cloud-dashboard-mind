@@ -15,6 +15,7 @@ interface TimelineDataPoint {
     duration?: string;
     reason: string;
     isActiveSignal?: boolean;
+    extendToEnd?: boolean;
 }
 
 interface TimelineChartProps {
@@ -358,7 +359,7 @@ export function TimelineChart({
                     )}
 
                     {/* Signal bars */}
-                    {timelineData.map((signal) => (
+                    {timelineData.map(signal => (
                         <TimelineSignal
                             key={signal.id}
                             id={signal.id}
@@ -375,6 +376,7 @@ export function TimelineChart({
                                 handleSignalMouseEnter(e, signal);
                             }}
                             isActiveSignal={signal.isActiveSignal}
+                            extendToEnd={signal.extendToEnd}
                         />
                     ))}
                 </div>

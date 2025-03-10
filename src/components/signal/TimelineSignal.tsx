@@ -12,6 +12,7 @@ interface TimelineSignalProps {
   isSelected: boolean;
   onClick: (e: React.MouseEvent) => void;
   isActiveSignal?: boolean; // New prop to indicate if this is the currently growing signal
+  extendToEnd?: boolean; // New prop to indicate if this signal should extend to the end
 }
 
 export function TimelineSignal({
@@ -25,7 +26,8 @@ export function TimelineSignal({
   reason,
   isSelected,
   onClick,
-  isActiveSignal = false
+  isActiveSignal = false,
+  extendToEnd = false
 }: TimelineSignalProps) {
   const [currentWidth, setCurrentWidth] = useState(width);
   const animationFrameRef = useRef<number>();
@@ -33,7 +35,7 @@ export function TimelineSignal({
   
   // Effect to animate width for active signals
   useEffect(() => {
-    if (isActiveSignal && status === 1) {
+    if (isActiveSignal) {
       // Function to update width based on current time
       const updateWidth = (timestamp: number) => {
         if (!lastUpdateRef.current) {
@@ -95,6 +97,17 @@ export function TimelineSignal({
       onClick={onClick}
       title={tooltipContent}
     >
+      {/* Add continuous status bar */}
+      {isActiveSignal && (
+        <div 
+          className={`absolute h-12 ${status === 1 ? 'bg-green-500' : 'bg-red-500'}`}
+          style={{
+            left: '100%',
+            width: '100vw', // Extend to the end of the viewport
+            bottom: '0',
+          }}
+        />
+      )}
       {currentWidth > 5 && (
         <div className="absolute inset-0 px-2 text-xs text-white flex items-center overflow-hidden whitespace-nowrap">
           {duration && currentWidth > 10 ? duration : ''}

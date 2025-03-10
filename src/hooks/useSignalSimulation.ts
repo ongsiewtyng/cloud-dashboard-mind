@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getRandomDowntimeReason, getCurrentTimeString } from "@/utils/signalUtils";
 import {
   addSignalLog,
@@ -16,77 +16,113 @@ export function useSignalSimulation(selectedMachine: string | null) {
   const [lastSimulationTime, setLastSimulationTime] = useState<number | null>(null);
   const [runningTimeStart, setRunningTimeStart] = useState<number | null>(null);
   const [lastDowntimeStart, setLastDowntimeStart] = useState<number | null>(null);
+  const [lastLogTime, setLastLogTime] = useState<number | null>(null);
 
   // Timeline boundaries (8 AM to 5 PM)
   const startTime = "08:00";
   const endTime = "17:00";
 
-  // Handle visibility change
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && lastSimulationTime) {
-        const now = Date.now();
-        const timeSinceLastSimulation = now - lastSimulationTime;
-        
-        // If more than 1 minute has passed, catch up on missed simulations
-        if (timeSinceLastSimulation > 60000 && selectedMachine && isSimulating) {
-          console.log(`Catching up on ${Math.floor(timeSinceLastSimulation / 60000)} minutes of missed simulation`);
-          runSimulation(selectedMachine, lastStatus);
-        }
-      }
-    };
+  // Function to add a signal log with proper duration tracking
+  const addSignalLogToService = useCallback(async (
+    machineId: string, 
+    status: "0" | "1", 
+    autoReason?: string,
+    timestamp?: Date
+  ) => {
+    if (!machineId) return false;
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [lastSimulationTime, selectedMachine, isSimulating, lastStatus]);
+    const now = timestamp || new Date();
+    const logTimestamp = now.toTimeString().substring(0, 8); // HH:MM:SS
+    const today = now.toISOString().split('T')[0];
 
-  // Subscribe to real-time signal logs when a machine is selected
-  useEffect(() => {
-    if (!selectedMachine) {
-      setSignalLogs([]);
-      setIsSimulating(false);
-      return;
+    // Prevent duplicate logs in the same minute
+    if (lastLogTime && (now.getTime() - lastLogTime) < 30000) { // 30 second minimum between logs
+      return false;
     }
 
-    let isInitialized = false;
-    console.log("Subscribing to signal logs for machines:", selectedMachine);
-    
-    const unsubscribe = subscribeToSignalLogs(selectedMachine, async (logs) => {
-      setSignalLogs(logs);
+    const reason = status === "1" ? "" : (autoReason || newLogReason);
+
+    // Calculate duration from the last status change
+    let duration = "0m";
+    if (status === "1" && lastDowntimeStart) {
+      const minutes = Math.floor((now.getTime() - lastDowntimeStart) / 60000);
+      duration = `${minutes}m`;
+    } else if (status === "0" && runningTimeStart) {
+      const minutes = Math.floor((now.getTime() - runningTimeStart) / 60000);
+      duration = `${minutes}m`;
+    }
+
+    // Add log to Firebase
+    const result = await addSignalLog(machineId, status, logTimestamp, reason);
+
+    if (result) {
+      setNewLogReason("");
+      setLastStatus(status);
+      setLastLogTime(now.getTime());
       
-      // Set last status based on most recent log
-      if (logs.length > 0) {
-        setLastStatus(logs[0].status);
+      // Update state based on status
+      if (status === "1") {
+        setRunningTimeStart(now.getTime());
+        setLastDowntimeStart(null);
+      } else {
+        setLastDowntimeStart(now.getTime());
+        setRunningTimeStart(null);
       }
 
-      // Only try to initialize once when we first get the logs
-      if (!isInitialized && isWithinTimelineBounds()) {
-        isInitialized = true;
-        const today = new Date().toISOString().split('T')[0];
-        const hasLogsForToday = logs.some(log => log.date === today);
+      await updateAllLogDurations(machineId);
+      return true;
+    }
+
+    return false;
+  }, [newLogReason, lastDowntimeStart, runningTimeStart, lastLogTime]);
+
+  // Simulation logic with realistic patterns
+  const runSimulation = useCallback(async (machineId: string, currentStatus: "0" | "1") => {
+    if (!isWithinTimelineBounds()) return;
+
+    const now = Date.now();
+    if (lastSimulationTime && (now - lastSimulationTime) < 60000) return;
+
+    let shouldChangeStatus = false;
+    let newStatus = currentStatus;
+    
+    if (currentStatus === "1") {
+      const minutesRunning = runningTimeStart ? Math.floor((now - runningTimeStart) / 60000) : 0;
+      
+      // Machine is more likely to fail after running for a long time
+      if (minutesRunning >= 30) {
+        const baseFailureChance = 0.02; // 2% base chance after 30 minutes
+        const additionalChancePerHour = 0.01; // Additional 1% per hour
+        const hoursRunning = (minutesRunning - 30) / 60;
+        const failureChance = Math.min(0.15, baseFailureChance + (hoursRunning * additionalChancePerHour));
         
-        if (!hasLogsForToday) {
-          console.log("No logs found for today, initializing...");
-          const initialStatus = Math.random() > 0.05 ? "1" : "0";
-          const reason = initialStatus === "0" ? getRandomDowntimeReason() : "";
-          await addSignalLogToService(selectedMachine, initialStatus, reason);
-        } else {
-          console.log("Found existing logs for today, skipping initialization");
+        shouldChangeStatus = Math.random() < failureChance;
+        if (shouldChangeStatus) {
+          newStatus = "0";
         }
       }
-    });
+    } else {
+      const minutesDown = lastDowntimeStart ? Math.floor((now - lastDowntimeStart) / 60000) : 0;
+      
+      // Recovery logic: Most issues should resolve within 1-5 minutes
+      if (minutesDown >= 1) {
+        const recoveryChance = minutesDown <= 5 ? 0.3 : 0.6; // 30% chance per minute up to 5 min, then 60%
+        shouldChangeStatus = Math.random() < recoveryChance;
+        if (shouldChangeStatus) {
+          newStatus = "1";
+        }
+      }
+    }
 
-    // Start simulation
-    setIsSimulating(true);
+    if (shouldChangeStatus && newStatus !== currentStatus) {
+      const reason = newStatus === "0" ? getRandomDowntimeReason() : "";
+      await addSignalLogToService(machineId, newStatus, reason);
+      setLastSimulationTime(now);
+    }
+  }, [lastSimulationTime, runningTimeStart, lastDowntimeStart, addSignalLogToService]);
 
-    return () => {
-      console.log("Unsubscribing from signal logs");
-      unsubscribe();
-    };
-  }, [selectedMachine]);
-
-  // Check if current time is within the timeline boundaries
-  const isWithinTimelineBounds = () => {
+  // Check if current time is within timeline boundaries
+  const isWithinTimelineBounds = useCallback(() => {
     const now = new Date();
     const currentHours = now.getHours();
     const currentMinutes = now.getMinutes();
@@ -99,120 +135,81 @@ export function useSignalSimulation(selectedMachine: string | null) {
     const endTimeMinutes = endHours * 60 + endMinutes;
 
     return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
-  };
+  }, [startTime, endTime]);
 
-  // Function to add a signal log
-  const addSignalLogToService = async (machineId: string, status: "0" | "1", autoReason?: string) => {
-    if (!machineId) return false;
+  // Initialize simulation when machine is selected
+  useEffect(() => {
+    if (!selectedMachine) {
+      setSignalLogs([]);
+      setIsSimulating(false);
+      return;
+    }
 
-    // Format timestamp in HH:MM:SS format
-    const timestamp = getCurrentTimeString();
+    let isInitialized = false;
     
-    // Extract HH:MM from timestamp
-    const timeMinute = timestamp.substring(0, 5);
-    
-    // Check if we already have a log in this minute
-    const existingLogInMinute = signalLogs.find(log => {
-      const logMinute = log.timestamp.substring(0, 5);
-      return logMinute === timeMinute;
+    const unsubscribe = subscribeToSignalLogs(selectedMachine, async (logs) => {
+      setSignalLogs(logs);
+      
+      if (logs.length > 0) {
+        const mostRecent = logs[0];
+        setLastStatus(mostRecent.status);
+        
+        // Set appropriate time trackers based on current status
+        const mostRecentTime = new Date();
+        if (mostRecent.status === "1") {
+          setRunningTimeStart(mostRecentTime.getTime());
+          setLastDowntimeStart(null);
+        } else {
+          setLastDowntimeStart(mostRecentTime.getTime());
+          setRunningTimeStart(null);
+        }
+      }
+
+      // Initialize if no logs exist for today
+      if (!isInitialized && isWithinTimelineBounds()) {
+        isInitialized = true;
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        const todayLogs = logs.filter(log => log.date === today);
+        
+        if (todayLogs.length === 0) {
+          // Start with running status (95% chance) at beginning of day
+          const initialStatus = Math.random() > 0.05 ? "1" : "0";
+          const startOfDay = new Date();
+          startOfDay.setHours(8, 0, 0, 0);
+          
+          await addSignalLogToService(selectedMachine, initialStatus, 
+            initialStatus === "0" ? getRandomDowntimeReason() : undefined,
+            startOfDay
+          );
+        }
+      }
     });
 
-    if (existingLogInMinute) {
-      console.log("Skipping duplicate log in same minute:", timeMinute);
-      return false;
-    }
+    setIsSimulating(true);
 
-    let reason = status === "1" ? "" : newLogReason;
+    return () => {
+      console.log("Unsubscribing from signal logs");
+      unsubscribe();
+    };
+  }, [selectedMachine, addSignalLogToService, isWithinTimelineBounds]);
 
-    if (autoReason && status === "0") {
-      reason = autoReason;
-    }
-
-    // Add log to Firebase
-    const result = await addSignalLog(machineId, status, timestamp, reason);
-
-    if (result) {
-      setNewLogReason("");
-      setLastStatus(status);
-
-      // Update durations of all logs when a new log is added
-      await updateAllLogDurations(machineId);
-
-      return true;
-    }
-
-    return false;
-  };
-
-  // Simulation logic extracted to a separate function
-  const runSimulation = async (machineId: string, currentStatus: "0" | "1") => {
-    if (!isWithinTimelineBounds()) return;
-
-    let randomStatus: "0" | "1";
-    const now = Date.now();
-    setLastSimulationTime(now);
-
-    if (currentStatus === "1") {
-      const minutesRunning = runningTimeStart ? 
-        Math.floor((now - runningTimeStart) / 60000) : 0;
-      
-      const downChance = Math.min(0.3, 0.05 + (Math.floor(minutesRunning / 5) * 0.01));
-      randomStatus = Math.random() < downChance ? "0" : "1";
-      
-      if (randomStatus === "0") {
-        setLastDowntimeStart(now);
-        setRunningTimeStart(null);
-        console.log(`Machine going down after running for ${minutesRunning} minutes`);
-      }
-    } else {
-      const minutesDown = lastDowntimeStart ? 
-        Math.floor((now - lastDowntimeStart) / 60000) : 0;
-      
-      const recoveryChance = Math.min(0.9, 0.2 * (minutesDown + 1));
-      randomStatus = Math.random() < recoveryChance ? "1" : "0";
-      
-      if (randomStatus === "1") {
-        console.log(`Machine recovered after ${minutesDown} minutes`);
-        setLastDowntimeStart(null);
-        setRunningTimeStart(now);
-      }
-    }
-
-    if (randomStatus !== currentStatus) {
-      const reason = randomStatus === "0" ? getRandomDowntimeReason() : "";
-      await addSignalLogToService(machineId, randomStatus, reason);
-      console.log("Status changed and logged:", randomStatus);
-    }
-  };
-
-  // Simulation effect with background support
+  // Run simulation at regular intervals
   useEffect(() => {
     if (isSimulating && selectedMachine) {
-      console.log("Starting real-time simulation for machine:", selectedMachine);
-      
-      if (lastStatus === "1") {
-        setRunningTimeStart(Date.now());
-      }
-
       const simulationInterval = window.setInterval(() => {
         runSimulation(selectedMachine, lastStatus);
-      }, 60000);
+      }, 60000); // Check every minute
 
-      return () => {
-        console.log("Stopping simulation");
-        clearInterval(simulationInterval);
-      };
+      return () => clearInterval(simulationInterval);
     }
-  }, [isSimulating, selectedMachine, lastStatus]);
+  }, [isSimulating, selectedMachine, lastStatus, runSimulation]);
 
   // Update a log's reason
   const updateLogReason = async (logId: string, reason: string) => {
     if (!selectedMachine) return false;
-
     const success = await updateSignalLogReason(logId, reason, selectedMachine);
-    if (success) {
-      setNewLogReason("");
-    }
+    if (success) setNewLogReason("");
     return success;
   };
 

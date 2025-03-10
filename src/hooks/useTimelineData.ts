@@ -42,9 +42,9 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         const nextPosition = calculateNormalizedPosition(sortedLogs[index + 1].timestamp, "08:00", "17:00") * 100;
         width = Math.max(0.5, nextPosition - position);
       } else {
-        // For the last log without endTimestamp, calculate width up to current time
+        // For the last log without endTimestamp, extend to current time
         width = Math.max(0.5, currentPosition - position);
-        isActiveSignal = true; // This is the active signal
+        isActiveSignal = true; // This is the active signal that should extend
       }
 
       // Ensure status is treated as a number
@@ -59,7 +59,8 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         endTimestamp: log.endTimestamp,
         duration: log.duration,
         reason: log.reason,
-        isActiveSignal // Add this flag to identify the active signal
+        isActiveSignal,
+        extendToEnd: isActiveSignal // Add this flag for the continuous bar
       };
 
       // Debug each point
