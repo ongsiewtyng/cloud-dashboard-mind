@@ -1,6 +1,2 @@
 {
-  "crons": [{
-    "path": "/api/cron/simulate",
-    "schedule": "* 8-17 * * 1-5"
-  }]
 } 
