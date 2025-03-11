@@ -18,7 +18,7 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
 
     // Sort logs by timestamp in descending order (newest first)
     const sortedLogs = [...signalLogs].sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      new Date(`${a.date}T${a.timestamp}`).getTime() - new Date(`${b.date}T${b.timestamp}`).getTime()
     );
 
     // Get current time for calculating active signal width
@@ -26,6 +26,7 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const currentPosition = calculateNormalizedPosition(currentTime, "08:00", "17:00") * 100;
 
+    // Create timeline points for all logs
     const timelinePoints = sortedLogs.map((log, index) => {
       // Calculate position based on timestamp
       const position = calculateNormalizedPosition(log.timestamp, "08:00", "17:00") * 100;
@@ -33,6 +34,7 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
       // Calculate width based on duration or next log
       let width = 0;
       let isActiveSignal = false;
+      let extendToEnd = false;
 
       if (log.endTimestamp) {
         const endPosition = calculateNormalizedPosition(log.endTimestamp, "08:00", "17:00") * 100;
@@ -42,9 +44,10 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         const nextPosition = calculateNormalizedPosition(sortedLogs[index + 1].timestamp, "08:00", "17:00") * 100;
         width = Math.max(0.5, nextPosition - position);
       } else {
-        // For the last log without endTimestamp, extend to current time
+        // For the last log, extend to current time
         width = Math.max(0.5, currentPosition - position);
-        isActiveSignal = true; // This is the active signal that should extend
+        isActiveSignal = true;
+        extendToEnd = true;
       }
 
       // Ensure status is treated as a number
@@ -60,7 +63,7 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         duration: log.duration,
         reason: log.reason,
         isActiveSignal,
-        extendToEnd: isActiveSignal // Add this flag for the continuous bar
+        extendToEnd
       };
 
       // Debug each point
@@ -68,6 +71,26 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
 
       return point;
     });
+
+    // Add a continuous status bar from the last log to current time
+    if (timelinePoints.length > 0) {
+      const lastLog = timelinePoints[timelinePoints.length - 1];
+      const lastPosition = lastLog.position + lastLog.width;
+      
+      // Only add continuous bar if there's a gap between last log and current time
+      if (lastPosition < currentPosition) {
+        timelinePoints.push({
+          id: 'continuous-status',
+          status: lastLog.status,
+          position: lastPosition,
+          width: currentPosition - lastPosition,
+          timestamp: lastLog.timestamp,
+          reason: '',
+          isActiveSignal: true,
+          extendToEnd: true
+        });
+      }
+    }
 
     // Debug final timeline data
     console.log('Final timeline points:', timelinePoints);

@@ -21,7 +21,30 @@ export function SignalHistory({
   onAddLog,
   updateLogReason
 }: SignalHistoryProps) {
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
   const timelineData = useTimelineData(signalLogs, machineId);
+
+  // Handle log selection from table
+  const handleLogSelect = (logId: string | null) => {
+    setSelectedLogId(logId);
+  };
+
+  // Reset selection when machine changes
+  useEffect(() => {
+    setSelectedLogId(null);
+  }, [machineId]);
+
+  // Listen for timeline deselection events
+  useEffect(() => {
+    const handleDeselect = () => {
+      setSelectedLogId(null);
+    };
+
+    window.addEventListener('timeline-deselect', handleDeselect);
+    return () => {
+      window.removeEventListener('timeline-deselect', handleDeselect);
+    };
+  }, []);
 
   return (
     <Card className="shadow-md border-slate-200">
@@ -36,11 +59,13 @@ export function SignalHistory({
           timelineData={timelineData} 
           startTime="08:00"
           endTime="17:00"
+          selectedSignalId={selectedLogId}
         />
         <LogsTable
           machineId={machineId}
           signalLogs={signalLogs}
           onUpdateReason={updateLogReason}
+          onLogSelect={handleLogSelect}
         />
       </CardContent>
     </Card>

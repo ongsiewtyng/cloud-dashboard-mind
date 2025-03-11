@@ -22,12 +22,14 @@ interface TimelineChartProps {
     timelineData: TimelineDataPoint[];
     startTime?: string;
     endTime?: string;
+    selectedSignalId?: string | null;
 }
 
 export function TimelineChart({
     timelineData,
     startTime = "08:00",
-    endTime = "17:00"
+    endTime = "17:00",
+    selectedSignalId
 }: TimelineChartProps) {
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState(0);
@@ -189,23 +191,38 @@ export function TimelineChart({
     const resetView = useCallback(() => {
         setZoom(1);
         setOffset(0);
-    }, []);
+        setHoveredSignal(null);
+        // Notify parent about deselection
+        if (selectedSignalId) {
+            const event = new CustomEvent('timeline-deselect');
+            window.dispatchEvent(event);
+        }
+    }, [selectedSignalId]);
 
-    // Click handler to center on specific point
+    // Click handler to center on specific point and handle deselection
     const handleTimelineClick = useCallback((e: React.MouseEvent) => {
         if (isDragging || !containerRef.current || isAutoCentering) return;
         
+        // If clicking the background (not a signal), trigger deselection
+        const clickedElement = e.target as HTMLElement;
+        const isClickingSignal = clickedElement.closest('.timeline-signal');
+        
+        if (!isClickingSignal) {
+            if (selectedSignalId) {
+                const event = new CustomEvent('timeline-deselect');
+                window.dispatchEvent(event);
+            }
+            return;
+        }
+        
         const rect = e.currentTarget.getBoundingClientRect();
         const clickPositionPercent = ((e.clientX - rect.left) / rect.width) * 100;
-        
-        // Calculate the actual position in the timeline, accounting for current zoom and offset
         const actualPosition = (clickPositionPercent / 100) * (100 / zoom) + offset;
         
-        // Center on this position if zoom level > 1
         if (zoom > 1) {
             centerAtPosition(actualPosition, zoom, true);
         }
-    }, [zoom, offset, isDragging, centerAtPosition, isAutoCentering]);
+    }, [zoom, offset, isDragging, centerAtPosition, isAutoCentering, selectedSignalId]);
 
     // Custom tooltip handlers
     const handleSignalMouseEnter = useCallback((e: React.MouseEvent, signal: TimelineDataPoint) => {
@@ -239,11 +256,43 @@ export function TimelineChart({
         ? timelineData.find(signal => signal.id === hoveredSignal) 
         : null;
 
+    // Effect to center on selected signal
+    useEffect(() => {
+        if (selectedSignalId) {
+            const selectedSignal = timelineData.find(signal => signal.id === selectedSignalId);
+            if (selectedSignal) {
+                // Auto zoom in if not already zoomed
+                if (zoom === 1) {
+                    const newZoom = 2;
+                    setZoom(newZoom);
+                }
+                
+                // Calculate the center position of the signal
+                const signalCenter = selectedSignal.position + (selectedSignal.width / 2);
+                centerAtPosition(signalCenter, zoom > 1 ? zoom : 2, true);
+                
+                // Set as hovered to show tooltip
+                setHoveredSignal(selectedSignalId);
+            }
+        }
+    }, [selectedSignalId, timelineData, zoom, centerAtPosition]);
+
+    // Handle signal click
+    const handleSignalClick = useCallback((e: React.MouseEvent, signal: TimelineDataPoint) => {
+        e.stopPropagation();
+        setHoveredSignal(signal.id);
+        setTooltipPosition({ 
+            x: e.clientX, 
+            y: e.clientY - 10
+        });
+    }, []);
+
     return (
         <div 
             className="relative w-full h-40 bg-white rounded-lg border border-slate-200 overflow-hidden"
             ref={containerRef}
             onWheel={handleWheel}
+            onClick={handleTimelineClick}
         >
             {/* Controls header */}
             <div className="absolute top-0 left-0 right-0 h-10 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 z-30">
@@ -326,7 +375,6 @@ export function TimelineChart({
                     handleMouseUp();
                     handleSignalMouseLeave();
                 }}
-                onClick={handleTimelineClick}
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
             >
                 <div 
@@ -359,7 +407,7 @@ export function TimelineChart({
                     )}
 
                     {/* Signal bars */}
-                    {timelineData.map(signal => (
+                    {timelineData.map((signal) => (
                         <TimelineSignal
                             key={signal.id}
                             id={signal.id}
@@ -370,11 +418,11 @@ export function TimelineChart({
                             endTimestamp={signal.endTimestamp}
                             duration={signal.duration}
                             reason={signal.reason}
-                            isSelected={hoveredSignal === signal.id}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleSignalMouseEnter(e, signal);
-                            }}
+                            isSelected={hoveredSignal === signal.id || selectedSignalId === signal.id}
+                            onClick={(e) => handleSignalClick(e, signal)}
+                            onMouseEnter={(e) => handleSignalMouseEnter(e, signal)}
+                            onMouseMove={handleSignalMouseMove}
+                            onMouseLeave={handleSignalMouseLeave}
                             isActiveSignal={signal.isActiveSignal}
                             extendToEnd={signal.extendToEnd}
                         />
