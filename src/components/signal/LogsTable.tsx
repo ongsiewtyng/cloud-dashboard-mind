@@ -44,9 +44,9 @@ export function LogsTable({ machineId, signalLogs, onUpdateReason, onLogSelect }
 
     const updateDuration = () => {
       const now = new Date();
-      const [hours, minutes] = activeLog.timestamp.split(':').map(Number);
+      const [hours, minutes, seconds = "00"] = activeLog.timestamp.split(':');
       const startDate = new Date();
-      startDate.setHours(hours, minutes, 0);
+      startDate.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds));
       
       // Calculate duration
       const diffMs = now.getTime() - startDate.getTime();
@@ -219,7 +219,11 @@ export function LogsTable({ machineId, signalLogs, onUpdateReason, onLogSelect }
                     </Badge>
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    {log === activeLog ? (activeDuration || '0m') : (log.duration || '-')}
+                    {log === activeLog ? (
+                      <span className="text-blue-600 font-medium">{activeDuration || '0m'}</span>
+                    ) : (
+                      <span>{log.duration || '-'}</span>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-sm">
                     {editingLogId === log.id ? (
