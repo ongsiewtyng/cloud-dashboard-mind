@@ -90,16 +90,17 @@ export function useSignalSimulation(selectedMachine: string | null) {
 
     const now = new Date();
     const updatedLogs = signalLogs.map((log, index) => {
-      // For all logs except the last one, keep their existing duration
-      if (index < signalLogs.length - 1) return log;
-
-      // For the last log, calculate the current duration
-      const logTime = new Date(`${log.date}T${log.timestamp}`);
-      const durationMinutes = Math.floor((now.getTime() - logTime.getTime()) / 60000);
-      return {
-        ...log,
-        duration: `${durationMinutes}m`
-      };
+      // Only update the active (last) log if it doesn't have an endTimestamp
+      if (index === 0 && !log.endTimestamp) {
+        const logTime = new Date(`${log.date}T${log.timestamp}`);
+        const durationMinutes = Math.floor((now.getTime() - logTime.getTime()) / 60000);
+        return {
+          ...log,
+          duration: `${durationMinutes}m`
+        };
+      }
+      // Keep existing durations for all other logs
+      return log;
     });
 
     setSignalLogs(updatedLogs);
@@ -108,8 +109,10 @@ export function useSignalSimulation(selectedMachine: string | null) {
   // Effect for real-time duration updates
   useEffect(() => {
     if (isSimulating && selectedMachine) {
-      // Update durations every 30 seconds instead of every second
-      const durationInterval = setInterval(updateDurationsInRealTime, 30000);
+      // Initial update
+      updateDurationsInRealTime();
+      // Update durations every minute
+      const durationInterval = setInterval(updateDurationsInRealTime, 60000);
       return () => clearInterval(durationInterval);
     }
   }, [isSimulating, selectedMachine, updateDurationsInRealTime]);

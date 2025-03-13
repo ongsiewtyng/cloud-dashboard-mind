@@ -1,4 +1,3 @@
-
 import { MachineRecord } from "@/lib/machine-service"
 import { Server, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -17,7 +16,9 @@ export function MachineList({ machines, onDelete, onMachineClick, selectedMachin
 
   const handleMachineClick = (id: string) => {
     console.log("Machine clicked in MachineList:", id);
-    onMachineClick && onMachineClick(id);
+    if (onMachineClick) {
+      onMachineClick(id);
+    }
   };
 
   return (
