@@ -38,7 +38,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
     console.log(`[${logTimestamp}] Attempting to add log - Status: ${status}, Machine: ${machineId}`);
 
     // Prevent duplicate logs in the same minute
-    if (lastLogTime && (now.getTime() - lastLogTime) < 30000) {
+    if (lastLogTime && (now.getTime() - lastLogTime) < 60000) {
       console.log(`[${logTimestamp}] Skipping log - Too soon since last log (${Math.floor((now.getTime() - lastLogTime) / 1000)}s)`);
       return false;
     }
@@ -108,8 +108,8 @@ export function useSignalSimulation(selectedMachine: string | null) {
   // Effect for real-time duration updates
   useEffect(() => {
     if (isSimulating && selectedMachine) {
-      // Update durations every second
-      const durationInterval = setInterval(updateDurationsInRealTime, 1000);
+      // Update durations every 30 seconds instead of every second
+      const durationInterval = setInterval(updateDurationsInRealTime, 30000);
       return () => clearInterval(durationInterval);
     }
   }, [isSimulating, selectedMachine, updateDurationsInRealTime]);
@@ -143,9 +143,6 @@ export function useSignalSimulation(selectedMachine: string | null) {
     console.log(`Initializing simulation for machine: ${selectedMachine}`);
     
     const unsubscribe = subscribeToSignalLogs(selectedMachine, async (logs) => {
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      
       // Sort logs by timestamp to ensure proper order
       const sortedLogs = [...logs].sort((a, b) => {
         const timeA = new Date(`${a.date}T${a.timestamp}`).getTime();
@@ -153,58 +150,6 @@ export function useSignalSimulation(selectedMachine: string | null) {
         return timeB - timeA; // Most recent first
       });
 
-      // Filter logs for today
-      const todayLogs = sortedLogs.filter(log => log.date === today);
-      
-      // Check if we need to initialize today's logs
-      const needsInitialization = todayLogs.length === 0 || 
-        (todayLogs.length > 0 && !todayLogs.some(log => log.timestamp === "08:00:00"));
-
-      if (needsInitialization && isWithinTimelineBounds()) {
-        // Generate historical data starting exactly at 8 AM
-        const startOfDay = new Date();
-        startOfDay.setHours(8, 0, 0, 0);
-        const currentTime = now.getTime();
-        
-        // Always start with a running state at 8 AM
-        await addSignalLogToService(selectedMachine, "1", "", startOfDay);
-        
-        let currentStatus = "1";
-        let currentTimestamp = startOfDay.getTime();
-        let lastStatusChange = currentTimestamp;
-
-        while (currentTimestamp < currentTime) {
-          if (currentStatus === "1") {
-            // Running period (30-45 minutes)
-            const runDuration = Math.floor(30 + Math.random() * 15) * 60000; // Convert minutes to milliseconds
-            currentTimestamp = lastStatusChange + runDuration;
-            
-            if (currentTimestamp < currentTime) {
-              // Create downtime log
-              const logTime = new Date(currentTimestamp);
-              await addSignalLogToService(selectedMachine, "0", getRandomDowntimeReason(), logTime);
-              currentStatus = "0";
-              lastStatusChange = currentTimestamp;
-            }
-          } else {
-            // Downtime period (1-5 minutes)
-            const downDuration = Math.floor(1 + Math.random() * 4) * 60000; // Convert minutes to milliseconds
-            currentTimestamp = lastStatusChange + downDuration;
-            
-            if (currentTimestamp < currentTime) {
-              // Create recovery log
-              const logTime = new Date(currentTimestamp);
-              await addSignalLogToService(selectedMachine, "1", "", logTime);
-              currentStatus = "1";
-              lastStatusChange = currentTimestamp;
-            }
-          }
-        }
-        
-        isInitialized = true;
-      }
-
-      // Update state with all logs
       setSignalLogs(sortedLogs);
       
       if (sortedLogs.length > 0) {
@@ -224,6 +169,53 @@ export function useSignalSimulation(selectedMachine: string | null) {
           console.log(`[${timestamp}] Initializing downtime tracker`);
           setLastDowntimeStart(mostRecentTime.getTime());
           setRunningTimeStart(null);
+        }
+      }
+
+      // Initialize if no logs exist for today
+      if (!isInitialized && isWithinTimelineBounds()) {
+        isInitialized = true;
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        const todayLogs = sortedLogs.filter(log => log.date === today);
+        
+        if (todayLogs.length === 0) {
+          // Generate historical data from 8 AM
+          const startOfDay = new Date();
+          startOfDay.setHours(8, 0, 0, 0);
+          const currentTime = now.getTime();
+          
+          let currentStatus = "1"; // Start running
+          let currentTimestamp = startOfDay.getTime();
+          let lastStatusChange = currentTimestamp;
+
+          while (currentTimestamp < currentTime) {
+            if (currentStatus === "1") {
+              // Running period (30-45 minutes)
+              const runDuration = Math.floor(30 + Math.random() * 15) * 60000; // Convert minutes to milliseconds
+              currentTimestamp = lastStatusChange + runDuration;
+              
+              if (currentTimestamp < currentTime) {
+                // Create downtime log
+                const logTime = new Date(currentTimestamp);
+                await addSignalLogToService(selectedMachine, "0", getRandomDowntimeReason(), logTime);
+                currentStatus = "0";
+                lastStatusChange = currentTimestamp;
+              }
+            } else {
+              // Downtime period (1-5 minutes)
+              const downDuration = Math.floor(1 + Math.random() * 4) * 60000; // Convert minutes to milliseconds
+              currentTimestamp = lastStatusChange + downDuration;
+              
+              if (currentTimestamp < currentTime) {
+                // Create recovery log
+                const logTime = new Date(currentTimestamp);
+                await addSignalLogToService(selectedMachine, "1", "", logTime);
+                currentStatus = "1";
+                lastStatusChange = currentTimestamp;
+              }
+            }
+          }
         }
       }
     });
@@ -254,7 +246,7 @@ export function useSignalSimulation(selectedMachine: string | null) {
     console.log(`[${timestamp}] Running simulation check - Current status: ${currentStatus}`);
     let shouldChangeStatus = false;
     let newStatus = currentStatus;
-    
+
     if (currentStatus === "1") {
       const minutesRunning = runningTimeStart ? Math.floor((now.getTime() - runningTimeStart) / 60000) : 0;
       console.log(`[${timestamp}] Machine has been running for ${minutesRunning} minutes`);
