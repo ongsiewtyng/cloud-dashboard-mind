@@ -48,7 +48,12 @@ unsigned long startTime = 0;
 unsigned long totalRunTime = 0;
 unsigned long lastSendTime = 0;
 unsigned long lastReadTime = 0;
+unsigned long lastWiFiCheckTime = 0;
 bool isConfigured = false;
+
+// WiFi scanning and status
+int wifiStatus = WL_IDLE_STATUS;
+int lastSignalStrength = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -68,6 +73,12 @@ void loop() {
     
     // Only proceed if WiFi is configured
     if (isConfigured) {
+        // Check WiFi connection and send status every 10 seconds
+        if (millis() - lastWiFiCheckTime >= 10000) {
+            lastWiFiCheckTime = millis();
+            checkWiFiStatus();
+        }
+        
         // Check WiFi connection
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("Reconnecting to WiFi...");
@@ -123,8 +134,77 @@ void checkForConfig() {
                 isConfigured = true;
                 connectToWiFi();
             }
+        } else if (command == "SCAN_WIFI") {
+            // Scan for available networks and return results
+            scanWiFiNetworks();
+        } else if (command == "WIFI_STATUS") {
+            // Report WiFi status
+            sendWiFiStatus();
         }
     }
+}
+
+void scanWiFiNetworks() {
+    Serial.println("Scanning WiFi networks...");
+    
+    int numNetworks = WiFi.scanNetworks();
+    
+    Serial.print("Found ");
+    Serial.print(numNetworks);
+    Serial.println(" networks");
+    
+    if (numNetworks > 0) {
+        // Create a JSON array with network info
+        StaticJsonDocument<1024> jsonDoc;
+        JsonArray networks = jsonDoc.createNestedArray("networks");
+        
+        for (int i = 0; i < numNetworks; i++) {
+            JsonObject network = networks.createNestedObject();
+            network["ssid"] = WiFi.SSID(i);
+            network["rssi"] = WiFi.RSSI(i);
+            network["encryption"] = WiFi.encryptionType(i);
+        }
+        
+        String networksList;
+        serializeJson(jsonDoc, networksList);
+        Serial.println(networksList);
+    }
+}
+
+void checkWiFiStatus() {
+    int status = WiFi.status();
+    int rssi = 0;
+    
+    if (status == WL_CONNECTED) {
+        rssi = WiFi.RSSI();
+        lastSignalStrength = rssi;
+    }
+    
+    if (status != wifiStatus) {
+        wifiStatus = status;
+        sendWiFiStatus();
+    } else if (abs(rssi - lastSignalStrength) > 5) {
+        // Signal strength changed significantly
+        lastSignalStrength = rssi;
+        sendWiFiStatus();
+    }
+}
+
+void sendWiFiStatus() {
+    StaticJsonDocument<256> jsonDoc;
+    
+    jsonDoc["type"] = "wifi_status";
+    jsonDoc["connected"] = (WiFi.status() == WL_CONNECTED);
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        jsonDoc["ssid"] = ssid;
+        jsonDoc["ip"] = WiFi.localIP().toString();
+        jsonDoc["signal_strength"] = WiFi.RSSI();
+    }
+    
+    String statusMessage;
+    serializeJson(jsonDoc, statusMessage);
+    Serial.println(statusMessage);
 }
 
 void connectToWiFi() {
@@ -148,6 +228,9 @@ void connectToWiFi() {
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
         digitalWrite(ledPin, HIGH); // Solid LED when connected
+        
+        // Send status update
+        sendWiFiStatus();
     } else {
         Serial.println("\nFailed to connect to WiFi!");
         digitalWrite(ledPin, LOW);

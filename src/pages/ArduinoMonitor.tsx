@@ -1,50 +1,28 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ArduinoDataChart } from "@/components/arduino/ArduinoDataChart";
-import { ArduinoStatusIndicator } from "@/components/arduino/ArduinoStatusIndicator";
 import { useArduinoData } from "@/hooks/useArduinoData";
-import { ArduinoData } from "@/lib/arduino-service";
-import { Code, Download, Settings, Wifi } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-// WiFi configuration form schema
-const wifiFormSchema = z.object({
-  ssid: z.string().min(1, "SSID is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-type WifiFormValues = z.infer<typeof wifiFormSchema>;
+import { Wifi } from "lucide-react";
+import { ArduinoConnectionCard } from "@/components/arduino/ArduinoConnectionCard";
+import { ArduinoDataLog } from "@/components/arduino/ArduinoDataLog";
+import { WifiConfigDialog } from "@/components/arduino/WifiConfigDialog";
 
 const ArduinoMonitor = () => {
   const { 
     arduinoData, 
     isConnected, 
+    wifiStatus,
     startListening, 
     stopListening, 
-    clearData 
+    clearData,
+    sendWifiConfig
   } = useArduinoData();
   
   const [isManualSetup, setIsManualSetup] = useState(true);
   const [isWifiDialogOpen, setIsWifiDialogOpen] = useState(false);
-
-  // Form for WiFi configuration
-  const form = useForm<WifiFormValues>({
-    resolver: zodResolver(wifiFormSchema),
-    defaultValues: {
-      ssid: "",
-      password: "",
-    },
-  });
 
   useEffect(() => {
     // Check if URL has connection parameter
@@ -85,19 +63,14 @@ const ArduinoMonitor = () => {
     toast.success("Arduino code downloaded");
   };
 
-  const onSubmitWifiConfig = (data: WifiFormValues) => {
-    // This function simulates sending the WiFi configuration to the Arduino
-    // In a real application, you would send this to your Arduino via Serial or API
-    console.log("WiFi Configuration:", data);
-    
-    const configCommand = `WIFI:${data.ssid}:${data.password}`;
-    console.log("Config Command:", configCommand);
-    
-    toast.success(`WiFi configuration updated! SSID: ${data.ssid}`);
+  const onSubmitWifiConfig = (data: { ssid: string; password: string }) => {
+    // Send WiFi configuration to Arduino
+    if (sendWifiConfig(data.ssid, data.password)) {
+      toast.success(`WiFi configuration updated! SSID: ${data.ssid}`);
+    } else {
+      toast.error("Failed to send WiFi configuration. Make sure Arduino is connected.");
+    }
     setIsWifiDialogOpen(false);
-    
-    // Reset form after submission
-    form.reset();
   };
 
   return (
@@ -141,32 +114,10 @@ const ArduinoMonitor = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Arduino Connection Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ArduinoStatusIndicator isConnected={isConnected} />
-            <div className="mt-4 text-sm">
-              <p className="mb-2">To connect your Arduino:</p>
-              <ol className="list-decimal pl-5 space-y-1">
-                <li>Upload the provided sketch to your Arduino</li>
-                <li>Configure WiFi settings using the "Configure WiFi" button</li>
-                <li>Use the URL parameter ?autoConnect=true for automatic connection</li>
-                <li>Or click "Start Monitoring" to begin receiving data</li>
-              </ol>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-2"
-                onClick={handleDownloadCode}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Arduino Code
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ArduinoConnectionCard 
+          isConnected={isConnected} 
+          onDownloadCode={handleDownloadCode} 
+        />
 
         <Card>
           <CardHeader>
@@ -178,129 +129,15 @@ const ArduinoMonitor = () => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Arduino Data Log</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Machine State</TableHead>
-                  <TableHead>Runtime (seconds)</TableHead>
-                  <TableHead>Recorded At</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {arduinoData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      No data received yet. Start monitoring to see data.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  arduinoData.map((data, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{data.timestamp}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          data.machineState === 'True' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {data.machineState === 'True' ? 'Running' : 'Stopped'}
-                        </span>
-                      </TableCell>
-                      <TableCell>{data.runTime}</TableCell>
-                      <TableCell>{new Date(data.recordedAt).toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <ArduinoDataLog data={arduinoData} />
 
       {/* WiFi Configuration Dialog */}
-      <Dialog open={isWifiDialogOpen} onOpenChange={setIsWifiDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Configure Arduino WiFi</DialogTitle>
-            <DialogDescription>
-              Enter the WiFi credentials for your Arduino to connect to.
-              This will be sent to your Arduino when it's connected via USB.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmitWifiConfig)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="ssid"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>WiFi Network Name (SSID)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter WiFi name" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The name of your WiFi network
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>WiFi Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Enter WiFi password" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The password for your WiFi network
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <Tabs defaultValue="usb" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="usb">USB Connection</TabsTrigger>
-                  <TabsTrigger value="manual">Manual Setup</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="usb" className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Connect your Arduino to your computer via USB and click Save.
-                    The configuration will be sent to the Arduino automatically.
-                  </p>
-                </TabsContent>
-                
-                <TabsContent value="manual" className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Copy this command and paste it into the Arduino Serial Monitor:
-                  </p>
-                  <div className="bg-slate-100 p-2 rounded-md">
-                    <code className="text-xs">
-                      WIFI:{form.watch("ssid")}:{form.watch("password")}
-                    </code>
-                  </div>
-                </TabsContent>
-              </Tabs>
-              
-              <DialogFooter>
-                <Button type="submit">Save Configuration</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <WifiConfigDialog
+        open={isWifiDialogOpen}
+        onOpenChange={setIsWifiDialogOpen}
+        onSubmitConfig={onSubmitWifiConfig}
+        availableNetworks={wifiStatus.networks}
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ArduinoData, saveArduinoData, getArduinoData, processArduinoData, clearArduinoData } from "@/lib/arduino-service";
+import { toast } from "sonner";
 
 // WebSocket connection URL - this would be replaced with your actual WebSocket server for Arduino
 const WEBSOCKET_URL = "ws://localhost:8080";
@@ -8,6 +9,14 @@ const WEBSOCKET_URL = "ws://localhost:8080";
 export function useArduinoData() {
   const [arduinoData, setArduinoData] = useState<ArduinoData[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [wifiStatus, setWifiStatus] = useState<{
+    connected: boolean;
+    networks?: string[];
+    ssid?: string;
+    strength?: number;
+  }>({
+    connected: false
+  });
   const [error, setError] = useState<string | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const simulationIntervalRef = useRef<number | null>(null);
@@ -17,6 +26,24 @@ export function useArduinoData() {
     console.log("Received Arduino data:", data);
     setArduinoData(prev => [...prev, data]);
     saveArduinoData(data);
+  }, []);
+
+  // Function to send WiFi configuration to Arduino
+  const sendWifiConfig = useCallback((ssid: string, password: string) => {
+    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+      const config = {
+        type: "wifi_config",
+        ssid,
+        password
+      };
+      websocketRef.current.send(JSON.stringify(config));
+      toast.success(`WiFi configuration sent to Arduino: ${ssid}`);
+      return true;
+    } else {
+      console.log("WebSocket not connected, can't send WiFi config");
+      toast.error("Cannot send WiFi configuration: Arduino not connected");
+      return false;
+    }
   }, []);
 
   // Initialize data from Firebase on mount
@@ -46,13 +73,34 @@ export function useArduinoData() {
         console.log("WebSocket connection established");
         setIsConnected(true);
         setError(null);
+        
+        // Request WiFi status after connection
+        socket.send(JSON.stringify({ type: "request_wifi_status" }));
       };
       
       socket.onmessage = (event) => {
         try {
-          const data = processArduinoData(event.data);
-          if (data) {
-            handleArduinoData(data);
+          const message = JSON.parse(event.data);
+          
+          // Handle different message types
+          if (message.type === "wifi_status") {
+            setWifiStatus({
+              connected: message.connected,
+              networks: message.networks,
+              ssid: message.ssid,
+              strength: message.strength
+            });
+          } else if (message.type === "data") {
+            const data = processArduinoData(JSON.stringify(message.data));
+            if (data) {
+              handleArduinoData(data);
+            }
+          } else {
+            // Process legacy format
+            const data = processArduinoData(event.data);
+            if (data) {
+              handleArduinoData(data);
+            }
           }
         } catch (err) {
           console.error("Error processing WebSocket message:", err);
@@ -82,6 +130,14 @@ export function useArduinoData() {
   const startSimulation = useCallback(() => {
     console.log("Starting Arduino data simulation");
     setIsConnected(true);
+    
+    // Simulate WiFi status
+    setWifiStatus({
+      connected: true,
+      networks: ["Home WiFi", "Office Network", "Guest Network"],
+      ssid: "Simulated WiFi",
+      strength: 75
+    });
     
     // Generate random data every 3 seconds
     const interval = window.setInterval(() => {
@@ -147,9 +203,11 @@ export function useArduinoData() {
   return {
     arduinoData,
     isConnected,
+    wifiStatus,
     error,
     startListening,
     stopListening,
-    clearData
+    clearData,
+    sendWifiConfig
   };
 }
