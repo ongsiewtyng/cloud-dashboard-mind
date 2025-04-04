@@ -1,10 +1,11 @@
+
 // Helper function to calculate time difference for duration display
 export const getTimeDifference = (start: string, end: string): string => {
   const [startHours, startMinutes, startSeconds = "0"] = start.split(":").map(Number);
   const [endHours, endMinutes, endSeconds = "0"] = end.split(":").map(Number);
   
-  const startTotalMinutes = startHours * 60 + startMinutes + (startSeconds / 60);
-  const endTotalMinutes = endHours * 60 + endMinutes + (endSeconds / 60);
+  const startTotalMinutes = (startHours * 60) + startMinutes + (Number(startSeconds) / 60);
+  const endTotalMinutes = (endHours * 60) + endMinutes + (Number(endSeconds) / 60);
   
   // Calculate the difference within the 8 AM - 5 PM window
   const totalMinutes = Math.max(0, endTotalMinutes - startTotalMinutes);

@@ -1,3 +1,4 @@
+
 import { useMemo } from "react";
 import { type SignalLog } from '@/lib/signal-service';
 import { calculateNormalizedPosition } from "@/utils/timelineUtils";
@@ -59,8 +60,8 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
         position,
         width,
         timestamp: log.timestamp,
-        endTimestamp: log.endTimestamp,
-        duration: log.duration,
+        endTimestamp: log.endTimestamp || "",
+        duration: log.duration || "0m",
         reason: log.reason,
         isActiveSignal,
         extendToEnd
@@ -85,6 +86,8 @@ export function useTimelineData(signalLogs: SignalLog[], machineId: string) {
           position: lastPosition,
           width: currentPosition - lastPosition,
           timestamp: lastLog.timestamp,
+          endTimestamp: "",
+          duration: "0m",
           reason: '',
           isActiveSignal: true,
           extendToEnd: true
