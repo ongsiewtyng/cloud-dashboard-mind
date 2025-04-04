@@ -13,8 +13,8 @@
 #include <WiFiS3.h>
 #include <ArduinoHttpClient.h>
 
-const char* ssid = "VA Guest 5Ghz";
-const char* password = "22335599";
+const char* ssid = "Ong823_5Ghz";
+const char* password = "tyng028823ying";
 const char* server = "cloud-dashboard-mind.vercel.app";
 const int port = 80;
 const int sensorPin = A0;

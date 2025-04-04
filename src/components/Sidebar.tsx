@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {LayoutDashboard, Server, Menu} from "lucide-react";
+import {LayoutDashboard, Server, Menu, SquareCode} from "lucide-react";
 import {Link, useLocation} from "react-router-dom";
 import {cn} from "@/lib/utils";
 
@@ -18,6 +18,11 @@ export function Sidebar() {
             path: "/machine-conditions",
             icon: <Server className="h-5 w-5"/>,
         },
+        {
+            name: "Arduino Data",
+            path: "/arduino-monitor",
+            icon: <SquareCode className="h-5 w-5"/>,
+        }
     ];
 
     return (
