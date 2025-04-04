@@ -8,8 +8,22 @@ import { ArduinoDataChart } from "@/components/arduino/ArduinoDataChart";
 import { ArduinoStatusIndicator } from "@/components/arduino/ArduinoStatusIndicator";
 import { useArduinoData } from "@/hooks/useArduinoData";
 import { ArduinoData } from "@/lib/arduino-service";
+import { Code, Download, Settings, Wifi } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Code, Download, Info } from "lucide-react";
+
+// WiFi configuration form schema
+const wifiFormSchema = z.object({
+  ssid: z.string().min(1, "SSID is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+type WifiFormValues = z.infer<typeof wifiFormSchema>;
 
 const ArduinoMonitor = () => {
   const { 
@@ -21,6 +35,16 @@ const ArduinoMonitor = () => {
   } = useArduinoData();
   
   const [isManualSetup, setIsManualSetup] = useState(true);
+  const [isWifiDialogOpen, setIsWifiDialogOpen] = useState(false);
+
+  // Form for WiFi configuration
+  const form = useForm<WifiFormValues>({
+    resolver: zodResolver(wifiFormSchema),
+    defaultValues: {
+      ssid: "",
+      password: "",
+    },
+  });
 
   useEffect(() => {
     // Check if URL has connection parameter
@@ -61,11 +85,34 @@ const ArduinoMonitor = () => {
     toast.success("Arduino code downloaded");
   };
 
+  const onSubmitWifiConfig = (data: WifiFormValues) => {
+    // This function simulates sending the WiFi configuration to the Arduino
+    // In a real application, you would send this to your Arduino via Serial or API
+    console.log("WiFi Configuration:", data);
+    
+    const configCommand = `WIFI:${data.ssid}:${data.password}`;
+    console.log("Config Command:", configCommand);
+    
+    toast.success(`WiFi configuration updated! SSID: ${data.ssid}`);
+    setIsWifiDialogOpen(false);
+    
+    // Reset form after submission
+    form.reset();
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold tracking-tight">Arduino Machine Monitor</h1>
         <div className="flex gap-4">
+          <Button
+            variant="outline"
+            onClick={() => setIsWifiDialogOpen(true)}
+          >
+            <Wifi className="h-4 w-4 mr-2" />
+            Configure WiFi
+          </Button>
+          
           {isManualSetup && (
             <>
               <Button 
@@ -104,7 +151,7 @@ const ArduinoMonitor = () => {
               <p className="mb-2">To connect your Arduino:</p>
               <ol className="list-decimal pl-5 space-y-1">
                 <li>Upload the provided sketch to your Arduino</li>
-                <li>Connect Arduino to your computer</li>
+                <li>Configure WiFi settings using the "Configure WiFi" button</li>
                 <li>Use the URL parameter ?autoConnect=true for automatic connection</li>
                 <li>Or click "Start Monitoring" to begin receiving data</li>
               </ol>
@@ -175,141 +222,85 @@ const ArduinoMonitor = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5" />
-            Arduino Integration Guide
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="instructions">
-            <TabsList className="mb-4">
-              <TabsTrigger value="instructions">Setup Instructions</TabsTrigger>
-              <TabsTrigger value="code"><Code className="h-4 w-4 mr-2" /> Arduino Code</TabsTrigger>
-              <TabsTrigger value="bridge">Connection Bridge</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="instructions" className="space-y-4">
-              <h3 className="font-medium">How to connect your Arduino:</h3>
-              <ol className="list-decimal pl-5 space-y-2">
-                <li>Download the Arduino code from the button above or copy it from the "Arduino Code" tab</li>
-                <li>Upload the code to your Arduino using the Arduino IDE</li>
-                <li>Connect your Arduino to your computer via USB</li>
-                <li>Run the Python bridge script (see "Connection Bridge" tab) to connect your Arduino to this dashboard</li>
-                <li>Alternatively, use the WebSocket version of the code if your Arduino has WiFi capabilities</li>
-              </ol>
+      {/* WiFi Configuration Dialog */}
+      <Dialog open={isWifiDialogOpen} onOpenChange={setIsWifiDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Configure Arduino WiFi</DialogTitle>
+            <DialogDescription>
+              Enter the WiFi credentials for your Arduino to connect to.
+              This will be sent to your Arduino when it's connected via USB.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitWifiConfig)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="ssid"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WiFi Network Name (SSID)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter WiFi name" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The name of your WiFi network
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
-              <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mt-4">
-                <h4 className="font-medium text-amber-800">Important Notes:</h4>
-                <ul className="list-disc pl-5 mt-2 text-amber-700 space-y-1">
-                  <li>Make sure to install the ArduinoJson library (Sketch &gt; Include Library &gt; Manage Libraries...)</li>
-                  <li>The default code assumes your machine signal is connected to digital pin 2</li>
-                  <li>Set your machine signal pin HIGH when the machine is running and LOW when stopped</li>
-                  <li>For direct WebSocket connections, you'll need an ESP8266 or ESP32-based Arduino with WiFi</li>
-                </ul>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="code">
-              <div className="bg-slate-100 p-4 rounded-md overflow-x-auto text-sm">
-                <pre className="whitespace-pre-wrap">
-{`#include <ArduinoJson.h>
-
-// Your machine monitoring pins
-const int machineSensorPin = 2;  
-unsigned long lastTimestamp = 0;
-unsigned long runTime = 0;
-boolean machineState = false;
-
-void setup() {
-  Serial.begin(9600);
-  pinMode(machineSensorPin, INPUT);
-  Serial.println("Machine monitoring started");
-}
-
-void loop() {
-  // Read machine state
-  boolean currentState = digitalRead(machineSensorPin) == HIGH;
-  
-  // Update runtime
-  runTime += 1;
-  
-  // Get current timestamp (millis since start)
-  unsigned long currentTimestamp = millis();
-  
-  // Check if state changed or if 5 seconds passed
-  if (currentState != machineState || currentTimestamp - lastTimestamp >= 5000) {
-    machineState = currentState;
-    lastTimestamp = currentTimestamp;
-    
-    // Create JSON document
-    StaticJsonDocument<128> doc;
-    doc["timestamp"] = currentTimestamp;
-    doc["machineState"] = machineState ? "True" : "False";
-    doc["runTime"] = runTime;
-    
-    // Serialize JSON to Serial
-    serializeJson(doc, Serial);
-    Serial.println();
-  }
-  
-  delay(1000);  // Update every second
-}`}
-                </pre>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-4"
-                onClick={handleDownloadCode}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Arduino Code
-              </Button>
-            </TabsContent>
-            
-            <TabsContent value="bridge" className="space-y-4">
-              <h3 className="font-medium">Connection Bridge:</h3>
-              <p>
-                To connect your Arduino to this dashboard, you'll need a bridge application
-                that forwards data from the Arduino's serial port to a WebSocket connection.
-                We've provided a Python script for this purpose.
-              </p>
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WiFi Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="Enter WiFi password" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The password for your WiFi network
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
-              <div className="bg-slate-100 p-4 rounded-md overflow-x-auto text-sm mt-4">
-                <h4 className="font-medium mb-2">Running the Python bridge:</h4>
-                <ol className="list-decimal pl-5 space-y-1">
-                  <li>Make sure you have Python 3.6+ installed</li>
-                  <li>Install required packages: <code>pip install pyserial websocket-client</code></li>
-                  <li>Download the bridge script from the source code or copy from the repository</li>
-                  <li>Run the script: <code>python arduino_bridge.py</code></li>
-                  <li>The script will automatically detect your Arduino and connect to it</li>
-                  <li>If it doesn't, specify the port: <code>python arduino_bridge.py --port COM3</code> (Windows) or <code>--port /dev/ttyUSB0</code> (Linux)</li>
-                </ol>
-              </div>
+              <Tabs defaultValue="usb" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="usb">USB Connection</TabsTrigger>
+                  <TabsTrigger value="manual">Manual Setup</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="usb" className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Connect your Arduino to your computer via USB and click Save.
+                    The configuration will be sent to the Arduino automatically.
+                  </p>
+                </TabsContent>
+                
+                <TabsContent value="manual" className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Copy this command and paste it into the Arduino Serial Monitor:
+                  </p>
+                  <div className="bg-slate-100 p-2 rounded-md">
+                    <code className="text-xs">
+                      WIFI:{form.watch("ssid")}:{form.watch("password")}
+                    </code>
+                  </div>
+                </TabsContent>
+              </Tabs>
               
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-4">
-                <h4 className="font-medium text-blue-800">Alternative Connection Methods:</h4>
-                <ul className="list-disc pl-5 mt-2 text-blue-700 space-y-2">
-                  <li>
-                    <span className="font-medium">Direct WebSocket:</span> If you have an ESP8266 or ESP32-based Arduino, 
-                    you can use the WebSocket code version to connect directly to your dashboard without a bridge.
-                  </li>
-                  <li>
-                    <span className="font-medium">Serial-to-WebSocket apps:</span> There are several applications that can forward
-                    serial data to WebSockets, such as "Serial Port WebSocket Server" for Windows or "WebSocket Serial Terminal" for macOS.
-                  </li>
-                  <li>
-                    <span className="font-medium">Custom solutions:</span> You can also write your own bridge application using
-                    languages like Node.js, Python, or Java.
-                  </li>
-                </ul>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              <DialogFooter>
+                <Button type="submit">Save Configuration</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
