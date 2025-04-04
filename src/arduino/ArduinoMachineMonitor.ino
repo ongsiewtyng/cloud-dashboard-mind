@@ -10,145 +10,106 @@
  * - (Optional) WebSocketClient: For direct WebSocket communication
  */
 
-#include <ArduinoJson.h>
+#include <WiFiS3.h>
+#include <ArduinoHttpClient.h>
 
-// Your machine monitoring pins
-const int machineSensorPin = 2;  
-unsigned long lastTimestamp = 0;
-unsigned long runTime = 0;
-boolean machineState = false;
+const char* ssid = "VA Guest 5Ghz";
+const char* password = "22335599";
+const char* server = "cloud-dashboard-mind.vercel.app";
+const int port = 80;
+const int sensorPin = A0;
 
-void setup() {
-  Serial.begin(9600);
-  pinMode(machineSensorPin, INPUT);
-  Serial.println("Machine monitoring started");
-}
+WiFiClient wifi;
+HttpClient client = HttpClient(wifi, server, port);
 
-void loop() {
-  // Read machine state
-  boolean currentState = digitalRead(machineSensorPin) == HIGH;
-  
-  // Update runtime
-  runTime += 1;
-  
-  // Get current timestamp (millis since start)
-  unsigned long currentTimestamp = millis();
-  
-  // Check if state changed or if 5 seconds passed
-  if (currentState != machineState || currentTimestamp - lastTimestamp >= 5000) {
-    machineState = currentState;
-    lastTimestamp = currentTimestamp;
-    
-    // Create JSON document
-    StaticJsonDocument<128> doc;
-    doc["timestamp"] = currentTimestamp;
-    doc["machineState"] = machineState ? "True" : "False";
-    doc["runTime"] = runTime;
-    
-    // Serialize JSON to Serial
-    serializeJson(doc, Serial);
-    Serial.println();
-  }
-  
-  delay(1000);  // Update every second
-}
+struct DataRecord {
+    unsigned long timestamp;
+    bool machineState;
+    unsigned long runTime;
+};
 
-/*
- * WebSocket Version - Uncomment this version if you have ESP8266/ESP32
- * and want to connect directly to the server without a bridge application.
- */
-/*
-#include <ESP8266WiFi.h>
-#include <WebSocketClient.h>
-#include <ArduinoJson.h>
+const int BUFFER_SIZE = 10;  // Store last 10 records before sending
+DataRecord dataBuffer[BUFFER_SIZE];
+int bufferIndex = 0;
 
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-const char* websocketServer = "your-dashboard-url.com";
-const int websocketPort = 80;
-const char* websocketPath = "/ws";
-
-WiFiClient client;
-WebSocketClient webSocketClient;
-const int machineSensorPin = 2;
-unsigned long lastTimestamp = 0;
-unsigned long runTime = 0;
-boolean machineState = false;
+bool machineState = false;
+unsigned long startTime = 0;
+unsigned long totalRunTime = 0;
 
 void setup() {
-  Serial.begin(9600);
-  pinMode(machineSensorPin, INPUT);
-  
-  // Connect to WiFi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
+    Serial.begin(115200);
+    while (!Serial);
+
     Serial.println("Connecting to WiFi...");
-  }
-  Serial.println("Connected to WiFi");
-  
-  // Connect to WebSocket server
-  if (client.connect(websocketServer, websocketPort)) {
-    Serial.println("Connected to WebSocket server");
-    webSocketClient.path = websocketPath;
-    webSocketClient.host = websocketServer;
-    if (webSocketClient.handshake(client)) {
-      Serial.println("WebSocket handshake successful");
-    } else {
-      Serial.println("WebSocket handshake failed");
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.print(".");
     }
-  } else {
-    Serial.println("Connection to WebSocket server failed");
-  }
+    Serial.println("\nConnected to WiFi!");
 }
 
 void loop() {
-  if (client.connected()) {
-    // Read machine state
-    boolean currentState = digitalRead(machineSensorPin) == HIGH;
-    
-    // Update runtime
-    runTime += 1;
-    
-    // Get current timestamp
-    unsigned long currentTimestamp = millis();
-    
-    // Check if state changed or if 5 seconds passed
-    if (currentState != machineState || currentTimestamp - lastTimestamp >= 5000) {
-      machineState = currentState;
-      lastTimestamp = currentTimestamp;
-      
-      // Create JSON document
-      StaticJsonDocument<128> doc;
-      doc["timestamp"] = currentTimestamp;
-      doc["machineState"] = machineState ? "True" : "False";
-      doc["runTime"] = runTime;
-      
-      // Serialize JSON to string
-      String jsonData;
-      serializeJson(doc, jsonData);
-      
-      // Send JSON data over WebSocket
-      webSocketClient.sendData(jsonData);
-      Serial.println("Data sent: " + jsonData);
+    bool currentState = readSensor();
+    if (currentState != machineState) {
+        machineState = currentState;
+        updateRunTime();
+        logData(machineState, totalRunTime);
     }
-    
-    // Check for WebSocket server data
-    String data;
-    if (webSocketClient.getData(data)) {
-      Serial.println("Received data: " + data);
+
+    if (bufferIndex == BUFFER_SIZE) {
+        sendData();
+        bufferIndex = 0;  // Reset buffer after sending
     }
-  } else {
-    Serial.println("Connection to WebSocket server lost. Reconnecting...");
-    if (client.connect(websocketServer, websocketPort)) {
-      webSocketClient.path = websocketPath;
-      webSocketClient.host = websocketServer;
-      if (webSocketClient.handshake(client)) {
-        Serial.println("WebSocket handshake successful");
-      }
-    }
-  }
-  
-  delay(1000);  // Update every second
+
+    delay(5000);
 }
-*/
+
+bool readSensor() {
+    int sensorValue = analogRead(sensorPin);
+    Serial.print("Sensor Value: ");
+    Serial.println(sensorValue);
+    return sensorValue > 500;
+}
+
+void updateRunTime() {
+    if (machineState) {
+        startTime = millis();
+    } else {
+        totalRunTime += (millis() - startTime) / 1000;
+    }
+}
+
+void logData(bool state, unsigned long runtime) {
+    dataBuffer[bufferIndex].timestamp = millis();
+    dataBuffer[bufferIndex].machineState = state;
+    dataBuffer[bufferIndex].runTime = runtime;
+    bufferIndex++;
+
+    Serial.println("Data logged in memory.");
+}
+
+void sendData() {
+    String jsonData = "[";
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+        jsonData += "{\"timestamp\": " + String(dataBuffer[i].timestamp) +
+                    ", \"machineState\": " + String(dataBuffer[i].machineState) +
+                    ", \"runTime\": " + String(dataBuffer[i].runTime) + "}";
+        if (i < BUFFER_SIZE - 1) jsonData += ",";
+    }
+    jsonData += "]";
+
+    Serial.println("Sending data: " + jsonData);
+
+    client.beginRequest();
+    client.post("/data");
+    client.sendHeader("Content-Type", "application/json");
+    client.sendHeader("Content-Length", jsonData.length());
+    client.beginBody();
+    client.print(jsonData);
+    client.endRequest();
+
+    int statusCode = client.responseStatusCode();
+    String response = client.responseBody();
+    Serial.println("Response: "+response);
+}
