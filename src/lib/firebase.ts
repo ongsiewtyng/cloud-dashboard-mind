@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref } from "firebase/database";
@@ -16,13 +17,14 @@ const firebaseConfig = {
     storageBucket: "mcm-dashboard-97482.firebasestorage.app",
     messagingSenderId: "712229552892",
     appId: "1:712229552892:web:673df0a0fdecfb88c38d79",
-    measurementId: "G-V5ZSL12GSN"
+    measurementId: "G-V5ZSL12GSN",
+    databaseURL: "https://mcm-dashboard-97482-default-rtdb.firebaseio.com" // Added database URL
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-const db = getDatabase(app); // ✅ Export the database correctly
+const db = getDatabase(app); 
 const auth = getAuth(app);
 const storage = getStorage(app);
 
