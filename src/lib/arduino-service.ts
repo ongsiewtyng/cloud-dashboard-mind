@@ -73,12 +73,29 @@ export const processArduinoData = (rawData: string): ArduinoData | null => {
       // Check if it's a sensor reading format (new format from Arduino)
       if (data.type === "sensor_reading") {
         console.log("Found sensor reading data:", data);
-        return {
-          timestamp: Date.now().toString(),
-          machineState: data.active ? "True" : "False",
-          runTime: data.timestamp ? data.timestamp.toString() : "0",
-          recordedAt: Date.now()
-        };
+        
+        // Check if this is a state change event
+        if (data.isStateChange === true) {
+          console.log("State change detected in sensor reading");
+          return {
+            timestamp: Date.now().toString(),
+            machineState: data.active ? "True" : "False",
+            runTime: data.timestamp ? data.timestamp.toString() : "0",
+            recordedAt: Date.now()
+          };
+        } else if (data.isStateChange === false) {
+          // If it's explicitly marked as not a state change, ignore it
+          console.log("Ignoring non-state change sensor reading");
+          return null;
+        } else {
+          // If isStateChange isn't specified, process normally (for backward compatibility)
+          return {
+            timestamp: Date.now().toString(),
+            machineState: data.active ? "True" : "False",
+            runTime: data.timestamp ? data.timestamp.toString() : "0",
+            recordedAt: Date.now()
+          };
+        }
       }
       
       // Validate standard format fields

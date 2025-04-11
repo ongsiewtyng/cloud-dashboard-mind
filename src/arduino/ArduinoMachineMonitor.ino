@@ -117,9 +117,9 @@ void loop() {
             }
         }
 
-        // Send data buffer if it's full or it's been more than 10 seconds (reduced from 30)
-        if (WiFi.status() == WL_CONNECTED &&
-            (bufferIndex == BUFFER_SIZE || (millis() - lastSendTime >= 10000 && bufferIndex > 0))) {
+        // We're now sending data immediately on state changes,
+        // but as a fallback, send any buffered data if the buffer gets full
+        if (WiFi.status() == WL_CONNECTED && bufferIndex == BUFFER_SIZE) {
             sendData();
             lastSendTime = millis();
         }
@@ -270,12 +270,14 @@ bool readSensor() {
             Serial.println(debouncedState ? "Button Pressed (ON)" : "Button Released (OFF)");
 
             // Send a structured sensor reading JSON for better processing
+            // Mark this as an explicit state change event
             StaticJsonDocument<128> sensorJson;
             sensorJson["type"] = "sensor_reading";
             sensorJson["value"] = debouncedState ? 1023 : 0; // Use 1023 for pressed, 0 for released
             sensorJson["active"] = debouncedState;
             sensorJson["timestamp"] = millis();
-
+            sensorJson["isStateChange"] = true; // Add this flag to mark state changes
+            
             String jsonString;
             serializeJson(sensorJson, jsonString);
             Serial.println(jsonString);
@@ -300,15 +302,21 @@ void updateRunTime() {
 }
 
 void logData(bool state, unsigned long runtime) {
+    // This is already a state change (only called when state changes)
     dataBuffer[bufferIndex].timestamp = millis();
     dataBuffer[bufferIndex].machineState = state;
     dataBuffer[bufferIndex].runTime = runtime;
     bufferIndex++;
     
-    Serial.print("Data logged: state=");
+    Serial.print("State change logged: state=");
     Serial.print(state ? "Running" : "Stopped");
     Serial.print(", runtime=");
     Serial.println(runtime);
+    
+    // If buffer has room, immediately send the state change
+    if (WiFi.status() == WL_CONNECTED) {
+        sendData();
+    }
 }
 
 void sendData() {

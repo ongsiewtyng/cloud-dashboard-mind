@@ -17,11 +17,9 @@ export function ArduinoDataLog({ data }: ArduinoDataLogProps) {
   
   // Filter and sort data on each update
   useEffect(() => {
-    // Filter data to include only "ON" records
-    const onRecords = data.filter(item => item.machineState === 'True');
-
-    // Sort filtered data by recordedAt (newest first)
-    const sortedData = [...onRecords].sort((a, b) =>
+    // Include both ON and OFF records - we want to see all state changes
+    // Sort data by recordedAt (newest first)
+    const sortedData = [...data].sort((a, b) =>
         (parseInt(b.recordedAt?.toString() || '0') - parseInt(a.recordedAt?.toString() || '0'))
     );
 
@@ -78,12 +76,9 @@ export function ArduinoDataLog({ data }: ArduinoDataLogProps) {
                 </TableRow>
               ) : (
                 filteredData.map((item, index) => {
-                  // Determine if this is a state change from previous
-                  const isStateChange = index === filteredData.length - 1 || 
-                    item.machineState !== filteredData[index + 1].machineState;
-                  
+                  // All items are now state changes by design
                   return (
-                    <TableRow key={index} className={isStateChange ? "bg-gray-50" : ""}>
+                    <TableRow key={index} className="bg-gray-50">
                       <TableCell>{formatTime(item.timestamp)}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -93,11 +88,9 @@ export function ArduinoDataLog({ data }: ArduinoDataLogProps) {
                         </span>
                       </TableCell>
                       <TableCell>
-                        {isStateChange ? (
-                          <Badge variant="outline" className="bg-blue-50">
-                            State Change
-                          </Badge>
-                        ) : "Update"}
+                        <Badge variant="outline" className="bg-blue-50">
+                          State Change
+                        </Badge>
                       </TableCell>
                       <TableCell>{new Date(item.recordedAt).toLocaleString()}</TableCell>
                     </TableRow>

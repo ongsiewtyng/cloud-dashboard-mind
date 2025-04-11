@@ -25,11 +25,26 @@ export function useArduinoData() {
   const simulationIntervalRef = useRef<number | null>(null);
   const serialPortRef = useRef<any>(null);
 
+  // Keep track of the last machine state to detect changes
+  const lastMachineStateRef = useRef<string | null>(null);
+  
   // Function to handle incoming Arduino data
   const handleArduinoData = useCallback((data: ArduinoData) => {
     console.log("Received Arduino data:", data);
-    setArduinoData(prev => [...prev, data]);
-    saveArduinoData(data);
+    
+    // Only process and save data when the state changes
+    if (lastMachineStateRef.current !== data.machineState) {
+      console.log("Switch state changed from", lastMachineStateRef.current, "to", data.machineState);
+      
+      // Update the state in memory and save to database
+      setArduinoData(prev => [...prev, data]);
+      saveArduinoData(data);
+      
+      // Update the reference to the new state
+      lastMachineStateRef.current = data.machineState;
+    } else {
+      console.log("Ignoring duplicate state:", data.machineState);
+    }
   }, []);
 
   // Function to send WiFi configuration to Arduino
@@ -365,18 +380,25 @@ export function useArduinoData() {
       strength: 75
     });
     
-    // Generate random data every 3 seconds
+    // Track the last state to simulate state changes
+    let lastSimulatedState = false; // Start with OFF state
+    
+    // Simulate state changes every 5 seconds instead of continuous data
     const interval = window.setInterval(() => {
+      // Toggle the state for the simulation
+      lastSimulatedState = !lastSimulatedState;
+      
       const now = Date.now();
       const newData: ArduinoData = {
         timestamp: now.toString(),
-        machineState: Math.random() > 0.3 ? "True" : "False", // 70% chance of being on
+        machineState: lastSimulatedState ? "True" : "False", // Toggle between ON and OFF
         runTime: (Math.floor(Math.random() * 100) + 100).toString(),
         recordedAt: now
       };
       
+      console.log("Simulating state change to:", lastSimulatedState ? "ON" : "OFF");
       handleArduinoData(newData);
-    }, 3000);
+    }, 5000); // Change state every 5 seconds
     
     simulationIntervalRef.current = interval;
   }, [handleArduinoData]);
