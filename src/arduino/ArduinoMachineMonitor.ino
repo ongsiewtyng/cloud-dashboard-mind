@@ -96,7 +96,7 @@ void loop() {
                 machineState = currentState;
                 updateRunTime();
                 logData(machineState, totalRunTime);
-                
+
                 // Send button state change immediately over serial
                 StaticJsonDocument<128> stateChangeJson;
                 stateChangeJson["type"] = "state_change";
@@ -118,7 +118,7 @@ void loop() {
         }
 
         // Send data buffer if it's full or it's been more than 10 seconds (reduced from 30)
-        if (WiFi.status() == WL_CONNECTED && 
+        if (WiFi.status() == WL_CONNECTED &&
             (bufferIndex == BUFFER_SIZE || (millis() - lastSendTime >= 10000 && bufferIndex > 0))) {
             sendData();
             lastSendTime = millis();
@@ -268,18 +268,18 @@ bool readSensor() {
         if (reading != debouncedState) {
             debouncedState = reading == LOW; // LOW means button is pressed
             Serial.println(debouncedState ? "Button Pressed (ON)" : "Button Released (OFF)");
-            
+
             // Send a structured sensor reading JSON for better processing
             StaticJsonDocument<128> sensorJson;
             sensorJson["type"] = "sensor_reading";
             sensorJson["value"] = debouncedState ? 1023 : 0; // Use 1023 for pressed, 0 for released
             sensorJson["active"] = debouncedState;
             sensorJson["timestamp"] = millis();
-            
+
             String jsonString;
             serializeJson(sensorJson, jsonString);
             Serial.println(jsonString);
-            
+
             // Also log in the old format for backward compatibility
             Serial.print("Sensor Value: ");
             Serial.println(debouncedState ? 1023 : 0);

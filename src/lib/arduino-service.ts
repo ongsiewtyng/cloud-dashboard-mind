@@ -19,12 +19,6 @@ const arduinoDataRef = ref(db, "arduinoData");
  */
 export const saveArduinoData = async (data: Omit<ArduinoData, "id" | "recordedAt">): Promise<string | null> => {
   try {
-    // Only save data if the machineState is "True" (ON)
-    if (data.machineState !== "True") {
-      console.log("Skipping data save as machineState is not 'True':", data);
-      return null;
-    }
-
     const newDataRef = push(arduinoDataRef);
     const dataWithTimestamp: ArduinoData = {
       ...data,
