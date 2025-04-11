@@ -17,11 +17,14 @@ export function ArduinoDataLog({ data }: ArduinoDataLogProps) {
   
   // Filter and sort data on each update
   useEffect(() => {
-    // Sort data by recordedAt (newest first)
-    const sortedData = [...data].sort((a, b) => 
-      (parseInt(b.recordedAt?.toString() || '0') - parseInt(a.recordedAt?.toString() || '0'))
+    // Filter data to include only "ON" records
+    const onRecords = data.filter(item => item.machineState === 'True');
+
+    // Sort filtered data by recordedAt (newest first)
+    const sortedData = [...onRecords].sort((a, b) =>
+        (parseInt(b.recordedAt?.toString() || '0') - parseInt(a.recordedAt?.toString() || '0'))
     );
-    
+
     setFilteredData(showAll ? sortedData : sortedData.slice(0, maxVisibleRows));
   }, [data, showAll]);
   
