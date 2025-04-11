@@ -24,7 +24,7 @@ const int serverPort = 80;
 const char* apiEndpoint = "/api/arduino-data";
 
 // Machine monitoring pins
-const int sensorPin = A0;
+const int sensorPin = 2;
 const int ledPin = LED_BUILTIN;
 const int debounceDelay = 50; // Debounce time in milliseconds to avoid connection issues
 
@@ -59,10 +59,10 @@ int lastSignalStrength = 0;
 void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 5000); // Wait for serial to connect but timeout after 5 seconds
-    
-    pinMode(ledPin, OUTPUT);
+
+    pinMode(sensorPin, INPUT_PULLUP);
     digitalWrite(ledPin, LOW);
-    
+
     Serial.println(F("Arduino Machine Monitor"));
     Serial.println(F("Waiting for WiFi configuration..."));
     Serial.println(F("Send configuration in format: WIFI:SSID:PASSWORD"));
@@ -71,7 +71,7 @@ void setup() {
 void loop() {
     // Check for configuration commands from serial
     checkForConfig();
-    
+
     // Only proceed if WiFi is configured
     if (isConfigured) {
         // Check WiFi connection and send status every 10 seconds
@@ -79,30 +79,30 @@ void loop() {
             lastWiFiCheckTime = millis();
             checkWiFiStatus();
         }
-        
+
         // Check WiFi connection
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("Reconnecting to WiFi...");
             connectToWiFi();
         }
-        
+
         // Read sensor and update state if connected
         if (WiFi.status() == WL_CONNECTED) {
             // Read sensor every second
             if (millis() - lastReadTime >= 1000) {
                 lastReadTime = millis();
                 bool currentState = readSensor();
-                
+
                 if (currentState != machineState) {
                     machineState = currentState;
                     updateRunTime();
                     logData(machineState, totalRunTime);
                 }
-                
+
                 // Blink LED to indicate active monitoring
                 digitalWrite(ledPin, !digitalRead(ledPin));
             }
-            
+
             // Send data buffer if it's full or it's been more than 30 seconds
             if (bufferIndex == BUFFER_SIZE || (millis() - lastSendTime >= 30000 && bufferIndex > 0)) {
                 sendData();
@@ -116,21 +116,21 @@ void checkForConfig() {
     if (Serial.available()) {
         String command = Serial.readStringUntil('\n');
         command.trim();
-        
+
         // Parse WIFI:SSID:PASSWORD command
         if (command.startsWith("WIFI:")) {
             int firstColon = command.indexOf(':', 5);
             if (firstColon > 5) {
                 String newSSID = command.substring(5, firstColon);
                 String newPassword = command.substring(firstColon + 1);
-                
+
                 // Store credentials
                 newSSID.toCharArray(ssid, 64);
                 newPassword.toCharArray(password, 64);
-                
+
                 Serial.print("New WiFi configuration: SSID=");
                 Serial.println(ssid);
-                
+
                 // Connect with new credentials
                 isConfigured = true;
                 connectToWiFi();
@@ -147,25 +147,25 @@ void checkForConfig() {
 
 void scanWiFiNetworks() {
     Serial.println("Scanning WiFi networks...");
-    
+
     int numNetworks = WiFi.scanNetworks();
-    
+
     Serial.print("Found ");
     Serial.print(numNetworks);
     Serial.println(" networks");
-    
+
     if (numNetworks > 0) {
         // Create a JSON array with network info
         StaticJsonDocument<1024> jsonDoc;
         JsonArray networks = jsonDoc.createNestedArray("networks");
-        
+
         for (int i = 0; i < numNetworks; i++) {
             JsonObject network = networks.createNestedObject();
             network["ssid"] = WiFi.SSID(i);
             network["rssi"] = WiFi.RSSI(i);
             network["encryption"] = WiFi.encryptionType(i);
         }
-        
+
         String networksList;
         serializeJson(jsonDoc, networksList);
         Serial.println(networksList);
@@ -175,12 +175,12 @@ void scanWiFiNetworks() {
 void checkWiFiStatus() {
     int status = WiFi.status();
     int rssi = 0;
-    
+
     if (status == WL_CONNECTED) {
         rssi = WiFi.RSSI();
         lastSignalStrength = rssi;
     }
-    
+
     if (status != wifiStatus) {
         wifiStatus = status;
         sendWiFiStatus();
@@ -193,16 +193,16 @@ void checkWiFiStatus() {
 
 void sendWiFiStatus() {
     StaticJsonDocument<256> jsonDoc;
-    
+
     jsonDoc["type"] = "wifi_status";
     jsonDoc["connected"] = (WiFi.status() == WL_CONNECTED);
-    
+
     if (WiFi.status() == WL_CONNECTED) {
         jsonDoc["ssid"] = ssid;
         jsonDoc["ip"] = WiFi.localIP().toString();
         jsonDoc["signal_strength"] = WiFi.RSSI();
     }
-    
+
     String statusMessage;
     serializeJson(jsonDoc, statusMessage);
     Serial.println(statusMessage);
@@ -211,11 +211,11 @@ void sendWiFiStatus() {
 void connectToWiFi() {
     Serial.print("Connecting to WiFi network: ");
     Serial.println(ssid);
-    
+
     WiFi.disconnect();
     delay(100);
     WiFi.begin(ssid, password);
-    
+
     // Try to connect for 20 seconds
     int attemptCount = 0;
     while (WiFi.status() != WL_CONNECTED && attemptCount < 20) {
@@ -223,13 +223,13 @@ void connectToWiFi() {
         Serial.print(".");
         attemptCount++;
     }
-    
+
     if (WiFi.status() == WL_CONNECTED) {
         Serial.println("\nConnected to WiFi!");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
         digitalWrite(ledPin, HIGH); // Solid LED when connected
-        
+
         // Send status update
         sendWiFiStatus();
     } else {
@@ -239,40 +239,28 @@ void connectToWiFi() {
 }
 
 bool readSensor() {
-    int sensorValue = analogRead(sensorPin);
-    // Add debouncing to prevent rapid state changes
-    static int lastSensorValue = 0;
+    static bool lastButtonState = HIGH;     // Last reading from input pin
+    static bool debouncedState = false;     // Debounced button state
     static unsigned long lastDebounceTime = 0;
-    static bool debouncedState = false;
-    
-    // Debug sensor values for troubleshooting
-    Serial.print("Sensor Value: ");
-    Serial.println(sensorValue);
-    
-    // Whenever sensor value changes significantly, print a specific marker for the web app
-    if (abs(sensorValue - lastSensorValue) > 50) {
+
+    bool reading = digitalRead(sensorPin);
+
+    if (reading != lastButtonState) {
         lastDebounceTime = millis();
-        
-        // Send a formatted message that will be easier to parse by the web app
-        StaticJsonDocument<128> sensorJson;
-        sensorJson["type"] = "sensor_reading";
-        sensorJson["value"] = sensorValue;
-        sensorJson["threshold"] = 500;
-        sensorJson["active"] = sensorValue > 500;
-        
-        String sensorJsonStr;
-        serializeJson(sensorJson, sensorJsonStr);
-        Serial.println(sensorJsonStr);
     }
-    
-    if ((millis() - lastDebounceTime) > 50) {
-        // If the sensor value is stable for 50ms, update the state
-        debouncedState = sensorValue > 500;
+
+    if ((millis() - lastDebounceTime) > debounceDelay) {
+        // If the button state has been stable for debounceDelay, take it as real
+        if (reading != debouncedState) {
+            debouncedState = reading == LOW; // LOW means button is pressed
+            Serial.println(debouncedState ? "Button Pressed (ON)" : "Button Released (OFF)");
+        }
     }
-    
-    lastSensorValue = sensorValue;
-    return debouncedState;
+
+    lastButtonState = reading;
+    return debouncedState; // true when pressed
 }
+
 
 void updateRunTime() {
     if (machineState) {
