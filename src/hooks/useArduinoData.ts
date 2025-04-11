@@ -164,7 +164,23 @@ export function useArduinoData() {
                       strength: jsonData.signal_strength
                     });
                     console.log("WiFi status updated:", jsonData);
-                  } else {
+                  } 
+                  // Handle the new sensor reading JSON format
+                  else if (jsonData.type === "sensor_reading") {
+                    console.log("Structured sensor reading received:", jsonData);
+                    
+                    // Create Arduino data from the sensor reading
+                    const now = Date.now();
+                    const data: ArduinoData = {
+                      timestamp: now.toString(),
+                      machineState: jsonData.active ? "True" : "False",
+                      runTime: "0", // We don't have runtime info in the sensor reading
+                      recordedAt: now
+                    };
+                    
+                    handleArduinoData(data);
+                  }
+                  else {
                     // Process as Arduino data
                     const data = processArduinoData(line);
                     if (data) {
@@ -172,10 +188,26 @@ export function useArduinoData() {
                     }
                   }
                 } catch (parseErr) {
-                  console.warn("Non-JSON data:", line);
+                  console.log("Processing non-JSON data:", line);
+                  
                   // Check if it's a WiFi configuration command response
                   if (line.startsWith("WiFi status:") || line.includes("networks found")) {
                     console.log("WiFi info received:", line);
+                  } 
+                  // Check if it's a sensor value debug message
+                  else if (line.includes("Sensor Value:")) {
+                    console.log("Sensor value detected:", line);
+                    const data = processArduinoData(line);
+                    if (data) {
+                      handleArduinoData(data);
+                    }
+                  }
+                  // Try to process data anyway in case our helper function can extract meaningful info
+                  else {
+                    const data = processArduinoData(line);
+                    if (data) {
+                      handleArduinoData(data);
+                    }
                   }
                 }
               }

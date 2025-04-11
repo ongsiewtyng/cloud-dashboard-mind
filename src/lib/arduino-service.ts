@@ -64,20 +64,41 @@ export const getArduinoData = async (): Promise<ArduinoData[]> => {
  */
 export const processArduinoData = (rawData: string): ArduinoData | null => {
   try {
-    const data = JSON.parse(rawData);
-    
-    // Validate required fields
-    if (!data.timestamp || !data.machineState || !data.runTime) {
-      console.error("Invalid Arduino data format:", data);
+    // Try to parse as JSON first
+    try {
+      const data = JSON.parse(rawData);
+      
+      // Validate required fields
+      if (!data.timestamp || !data.machineState || !data.runTime) {
+        console.error("Invalid Arduino data format:", data);
+        return null;
+      }
+      
+      return {
+        timestamp: data.timestamp.toString(),
+        machineState: data.machineState,
+        runTime: data.runTime.toString(),
+        recordedAt: Date.now()
+      };
+    } catch (jsonError) {
+      // Check if it's a raw sensor value (e.g., "Sensor Value: 104")
+      if (rawData.includes("Sensor Value:")) {
+        const sensorValueMatch = rawData.match(/Sensor Value:\s*(\d+)/);
+        if (sensorValueMatch && sensorValueMatch[1]) {
+          const sensorValue = parseInt(sensorValueMatch[1]);
+          // Create a synthetic data point based on the sensor value
+          return {
+            timestamp: Date.now().toString(),
+            machineState: sensorValue > 500 ? "True" : "False", // Use the same threshold as Arduino code
+            runTime: "0", // We don't have runtime for raw sensors, so use 0
+            recordedAt: Date.now()
+          };
+        }
+      }
+      
+      // If we couldn't parse as sensor value either, return null
       return null;
     }
-    
-    return {
-      timestamp: data.timestamp.toString(),
-      machineState: data.machineState,
-      runTime: data.runTime.toString(),
-      recordedAt: Date.now()
-    };
   } catch (error) {
     console.error("Error processing Arduino data:", error);
     return null;

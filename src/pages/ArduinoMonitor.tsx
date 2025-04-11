@@ -10,6 +10,7 @@ import { ArduinoConnectionCard } from "@/components/arduino/ArduinoConnectionCar
 import { ArduinoDataLog } from "@/components/arduino/ArduinoDataLog";
 import { WifiConfigDialog } from "@/components/arduino/WifiConfigDialog";
 import { ConnectionTroubleshooting } from "@/components/arduino/ConnectionTroubleshooting";
+import { RawSensorDataLog } from "@/components/arduino/RawSensorDataLog";
 
 const ArduinoMonitor = () => {
   const { 
@@ -154,7 +155,12 @@ const ArduinoMonitor = () => {
         </Card>
       </div>
 
-      <ArduinoDataLog data={arduinoData} />
+      <div className="grid gap-6 md:grid-cols-2">
+        <ArduinoDataLog data={arduinoData} />
+        
+        {/* Add Raw Sensor Data Log that directly processes sensor values */}
+        <RawSensorDataLog isConnected={isConnected} />
+      </div>
 
       {/* Add Connection Troubleshooting */}
       <div className="mt-4">

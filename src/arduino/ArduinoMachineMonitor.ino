@@ -249,9 +249,20 @@ bool readSensor() {
     Serial.print("Sensor Value: ");
     Serial.println(sensorValue);
     
-    // Debounce logic to prevent connection issues during rapid switching
+    // Whenever sensor value changes significantly, print a specific marker for the web app
     if (abs(sensorValue - lastSensorValue) > 50) {
         lastDebounceTime = millis();
+        
+        // Send a formatted message that will be easier to parse by the web app
+        StaticJsonDocument<128> sensorJson;
+        sensorJson["type"] = "sensor_reading";
+        sensorJson["value"] = sensorValue;
+        sensorJson["threshold"] = 500;
+        sensorJson["active"] = sensorValue > 500;
+        
+        String sensorJsonStr;
+        serializeJson(sensorJson, sensorJsonStr);
+        Serial.println(sensorJsonStr);
     }
     
     if ((millis() - lastDebounceTime) > 50) {
