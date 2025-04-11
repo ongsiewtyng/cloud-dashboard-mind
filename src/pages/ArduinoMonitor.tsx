@@ -20,7 +20,8 @@ const ArduinoMonitor = () => {
     startListening, 
     stopListening, 
     clearData,
-    sendWifiConfig
+    sendWifiConfig,
+    scanWifiNetworks
   } = useArduinoData();
   
   const [isManualSetup, setIsManualSetup] = useState(true);
@@ -65,6 +66,26 @@ const ArduinoMonitor = () => {
     toast.success("Arduino code downloaded");
   };
 
+  const [isScanning, setIsScanning] = useState(false);
+  
+  const handleScanWifiNetworks = async () => {
+    setIsScanning(true);
+    try {
+      // Request a scan from the Arduino using the hook function
+      if (await scanWifiNetworks()) {
+        toast.success("Scanning for WiFi networks...");
+      } else {
+        toast.error("Arduino not connected. Cannot scan for networks.");
+      }
+    } catch (err) {
+      console.error("Error scanning WiFi networks:", err);
+      toast.error("Failed to scan for WiFi networks");
+    } finally {
+      // Reset after a timeout
+      setTimeout(() => setIsScanning(false), 5000);
+    }
+  };
+
   const onSubmitWifiConfig = (data: { ssid: string; password: string }) => {
     // Send WiFi configuration to Arduino
     if (sendWifiConfig(data.ssid, data.password)) {
@@ -72,7 +93,7 @@ const ArduinoMonitor = () => {
     } else {
       toast.error("Failed to send WiFi configuration. Make sure Arduino is connected.");
     }
-    setIsWifiDialogOpen(false);
+    // Keep dialog open to see status
   };
 
   return (
@@ -150,6 +171,7 @@ const ArduinoMonitor = () => {
         onSubmitConfig={onSubmitWifiConfig}
         availableNetworks={wifiStatus.networks}
         isConnected={isConnected}
+        onScanNetworks={handleScanWifiNetworks}
       />
     </div>
   );

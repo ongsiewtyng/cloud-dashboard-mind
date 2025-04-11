@@ -26,6 +26,7 @@ const char* apiEndpoint = "/api/arduino-data";
 // Machine monitoring pins
 const int sensorPin = A0;
 const int ledPin = LED_BUILTIN;
+const int debounceDelay = 50; // Debounce time in milliseconds to avoid connection issues
 
 // WiFi and HTTP client
 WiFiClient wifi;
@@ -239,9 +240,27 @@ void connectToWiFi() {
 
 bool readSensor() {
     int sensorValue = analogRead(sensorPin);
-    // Serial.print("Sensor Value: "); // Uncomment for debugging
-    // Serial.println(sensorValue);    // Uncomment for debugging
-    return sensorValue > 500; // Threshold value (adjust as needed)
+    // Add debouncing to prevent rapid state changes
+    static int lastSensorValue = 0;
+    static unsigned long lastDebounceTime = 0;
+    static bool debouncedState = false;
+    
+    // Debug sensor values for troubleshooting
+    Serial.print("Sensor Value: ");
+    Serial.println(sensorValue);
+    
+    // Debounce logic to prevent connection issues during rapid switching
+    if (abs(sensorValue - lastSensorValue) > 50) {
+        lastDebounceTime = millis();
+    }
+    
+    if ((millis() - lastDebounceTime) > 50) {
+        // If the sensor value is stable for 50ms, update the state
+        debouncedState = sensorValue > 500;
+    }
+    
+    lastSensorValue = sensorValue;
+    return debouncedState;
 }
 
 void updateRunTime() {

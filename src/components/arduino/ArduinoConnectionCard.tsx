@@ -52,7 +52,7 @@ export function ArduinoConnectionCard({
         </div>
       </CardHeader>
       <CardContent>
-        <ArduinoStatusIndicator isConnected={isConnected} />
+        <ArduinoStatusIndicator isConnected={isConnected} wifiStatus={wifiStatus} />
         
         {/* WiFi Status Information */}
         {wifiStatus.connected && wifiStatus.ssid && (

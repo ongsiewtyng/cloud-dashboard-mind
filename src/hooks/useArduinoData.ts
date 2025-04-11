@@ -410,6 +410,38 @@ export function useArduinoData() {
     };
   }, [stopListening]);
 
+  // Function to scan for available WiFi networks
+  const scanWifiNetworks = useCallback(async () => {
+    console.log("Scanning for WiFi networks...");
+    
+    // Try to send scan command through Serial if connected
+    if (serialPortRef.current) {
+      try {
+        const writer = serialPortRef.current.writable.getWriter();
+        const encoder = new TextEncoder();
+        await writer.write(encoder.encode("SCAN_WIFI\n"));
+        writer.releaseLock();
+        return true;
+      } catch (err) {
+        console.error("Error sending WiFi scan command:", err);
+        return false;
+      }
+    }
+    
+    // Try to send scan command through WebSocket if connected
+    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+      try {
+        websocketRef.current.send(JSON.stringify({ type: "scan_wifi" }));
+        return true;
+      } catch (err) {
+        console.error("Error sending WiFi scan command via WebSocket:", err);
+        return false;
+      }
+    }
+    
+    return false;
+  }, []);
+
   return {
     arduinoData,
     isConnected,
@@ -418,6 +450,7 @@ export function useArduinoData() {
     startListening,
     stopListening,
     clearData,
-    sendWifiConfig
+    sendWifiConfig,
+    scanWifiNetworks
   };
 }
