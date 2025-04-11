@@ -9,12 +9,14 @@ import { Wifi } from "lucide-react";
 import { ArduinoConnectionCard } from "@/components/arduino/ArduinoConnectionCard";
 import { ArduinoDataLog } from "@/components/arduino/ArduinoDataLog";
 import { WifiConfigDialog } from "@/components/arduino/WifiConfigDialog";
+import { ConnectionTroubleshooting } from "@/components/arduino/ConnectionTroubleshooting";
 
 const ArduinoMonitor = () => {
   const { 
     arduinoData, 
     isConnected, 
     wifiStatus,
+    error,
     startListening, 
     stopListening, 
     clearData,
@@ -116,7 +118,9 @@ const ArduinoMonitor = () => {
       <div className="grid gap-6 md:grid-cols-2">
         <ArduinoConnectionCard 
           isConnected={isConnected} 
-          onDownloadCode={handleDownloadCode} 
+          onDownloadCode={handleDownloadCode}
+          wifiStatus={wifiStatus}
+          error={error}
         />
 
         <Card>
@@ -131,12 +135,21 @@ const ArduinoMonitor = () => {
 
       <ArduinoDataLog data={arduinoData} />
 
+      {/* Add Connection Troubleshooting */}
+      <div className="mt-4">
+        <ConnectionTroubleshooting 
+          onScanPorts={handleStartMonitoring}
+          onReconnect={handleStartMonitoring}
+        />
+      </div>
+      
       {/* WiFi Configuration Dialog */}
       <WifiConfigDialog
         open={isWifiDialogOpen}
         onOpenChange={setIsWifiDialogOpen}
         onSubmitConfig={onSubmitWifiConfig}
         availableNetworks={wifiStatus.networks}
+        isConnected={isConnected}
       />
     </div>
   );

@@ -5,10 +5,11 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Wifi } from "lucide-react";
+import { Wifi, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 // WiFi configuration form schema
@@ -24,13 +25,15 @@ interface WifiConfigDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmitConfig: (config: WifiFormValues) => void;
   availableNetworks?: string[]; // Optional list of detected networks
+  isConnected?: boolean; // Whether Arduino is connected
 }
 
 export function WifiConfigDialog({ 
   open, 
   onOpenChange, 
   onSubmitConfig,
-  availableNetworks = []
+  availableNetworks = [],
+  isConnected = false
 }: WifiConfigDialogProps) {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
 
@@ -145,8 +148,25 @@ export function WifiConfigDialog({
               </TabsContent>
             </Tabs>
             
+            {!isConnected && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Arduino Not Connected</AlertTitle>
+                <AlertDescription className="text-xs">
+                  Your Arduino is not currently connected. Please connect your Arduino 
+                  via USB and press "Start Monitoring" before configuring WiFi.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <DialogFooter>
-              <Button type="submit">Save Configuration</Button>
+              <Button 
+                type="submit" 
+                disabled={!isConnected}
+                title={!isConnected ? "Connect Arduino first" : "Save configuration"}
+              >
+                Save Configuration
+              </Button>
             </DialogFooter>
           </form>
         </Form>

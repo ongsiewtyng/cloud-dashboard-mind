@@ -3,8 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ArduinoData, saveArduinoData, getArduinoData, processArduinoData, clearArduinoData } from "@/lib/arduino-service";
 import { toast } from "sonner";
 
-// WebSocket connection URL - this would be replaced with your actual WebSocket server for Arduino
-const WEBSOCKET_URL = "ws://localhost:8080";
+// WebSocket connection URL - configurable for different environments
+const WEBSOCKET_URL = import.meta.env.VITE_ARDUINO_WEBSOCKET_URL || "ws://localhost:8080";
+
+// Serial port connection options
+const SERIAL_BAUD_RATE = 115200;
 
 export function useArduinoData() {
   const [arduinoData, setArduinoData] = useState<ArduinoData[]>([]);
@@ -20,6 +23,7 @@ export function useArduinoData() {
   const [error, setError] = useState<string | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const simulationIntervalRef = useRef<number | null>(null);
+  const serialPortRef = useRef<any>(null);
 
   // Function to handle incoming Arduino data
   const handleArduinoData = useCallback((data: ArduinoData) => {
@@ -29,8 +33,26 @@ export function useArduinoData() {
   }, []);
 
   // Function to send WiFi configuration to Arduino
-  const sendWifiConfig = useCallback((ssid: string, password: string) => {
+  const sendWifiConfig = useCallback(async (ssid: string, password: string) => {
+    // First try to send via Serial if connected
+    if (serialPortRef.current) {
+      try {
+        console.log("Sending WiFi config via Serial");
+        const writer = serialPortRef.current.writable.getWriter();
+        const encoder = new TextEncoder();
+        const configString = `WIFI:${ssid}:${password}\n`;
+        await writer.write(encoder.encode(configString));
+        writer.releaseLock();
+        toast.success(`WiFi configuration sent to Arduino: ${ssid}`);
+        return true;
+      } catch (err) {
+        console.error("Error sending WiFi config via Serial:", err);
+      }
+    }
+    
+    // If Serial failed or not connected, try WebSocket
     if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+      console.log("Sending WiFi config via WebSocket");
       const config = {
         type: "wifi_config",
         ssid,
@@ -39,11 +61,12 @@ export function useArduinoData() {
       websocketRef.current.send(JSON.stringify(config));
       toast.success(`WiFi configuration sent to Arduino: ${ssid}`);
       return true;
-    } else {
-      console.log("WebSocket not connected, can't send WiFi config");
-      toast.error("Cannot send WiFi configuration: Arduino not connected");
-      return false;
-    }
+    } 
+    
+    // If we got here, neither connection method worked
+    console.log("No connection available to send WiFi config");
+    toast.error("Cannot send WiFi configuration: Arduino not connected");
+    return false;
   }, []);
 
   // Initialize data from Firebase on mount
@@ -62,11 +85,137 @@ export function useArduinoData() {
     fetchInitialData();
   }, []);
 
+  // Define the Serial API type to avoid TypeScript errors
+  interface SerialPort {
+    open: (options: { baudRate: number }) => Promise<void>;
+    readable: ReadableStream;
+    writable: WritableStream;
+    close: () => Promise<void>;
+  }
+
+  interface SerialPortRequestOptions {
+    filters?: Array<{ usbVendorId?: number; usbProductId?: number }>;
+  }
+
+  interface NavigatorWithSerial extends Navigator {
+    serial: {
+      requestPort: (options?: SerialPortRequestOptions) => Promise<SerialPort>;
+      getPorts: () => Promise<SerialPort[]>;
+    };
+  }
+  
+  // Try to connect directly via Serial API if available in browser
+  const startSerialConnection = useCallback(async () => {
+    try {
+      // Check if Web Serial API is available
+      if (!('serial' in navigator)) {
+        console.log("Web Serial API not available, trying WebSocket");
+        return false;
+      }
+
+      // Prompt user to select serial port
+      console.log("Requesting serial port access...");
+      const navigatorWithSerial = navigator as NavigatorWithSerial;
+      const port = await navigatorWithSerial.serial.requestPort();
+      await port.open({ baudRate: SERIAL_BAUD_RATE });
+
+      console.log("Serial port opened successfully");
+      setIsConnected(true);
+      setError(null);
+
+      // Set up the reader and read loop
+      const reader = port.readable.getReader();
+      let decoder = new TextDecoder();
+      let buffer = "";
+
+      // Read loop function
+      const readLoop = async () => {
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+              console.log("Serial connection closed");
+              break;
+            }
+            
+            // Decode the received bytes and add to buffer
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            
+            // Process complete lines
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+              const line = buffer.substring(0, newlineIndex).trim();
+              buffer = buffer.substring(newlineIndex + 1);
+              
+              if (line.length > 0) {
+                console.log("Serial data received:", line);
+                
+                try {
+                  // Try to parse as JSON
+                  const jsonData = JSON.parse(line);
+                  
+                  // Handle different message types
+                  if (jsonData.type === "wifi_status") {
+                    setWifiStatus({
+                      connected: jsonData.connected,
+                      networks: jsonData.networks || [],
+                      ssid: jsonData.ssid,
+                      strength: jsonData.signal_strength
+                    });
+                    console.log("WiFi status updated:", jsonData);
+                  } else {
+                    // Process as Arduino data
+                    const data = processArduinoData(line);
+                    if (data) {
+                      handleArduinoData(data);
+                    }
+                  }
+                } catch (parseErr) {
+                  console.warn("Non-JSON data:", line);
+                  // Check if it's a WiFi configuration command response
+                  if (line.startsWith("WiFi status:") || line.includes("networks found")) {
+                    console.log("WiFi info received:", line);
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error reading from serial:", err);
+          setError(`Serial reading error: ${err.message}`);
+          setIsConnected(false);
+        } finally {
+          reader.releaseLock();
+        }
+      };
+
+      // Start the read loop
+      readLoop();
+
+      // Send command to scan WiFi networks
+      if (port.writable) {
+        const writer = port.writable.getWriter();
+        const encoder = new TextEncoder();
+        await writer.write(encoder.encode("SCAN_WIFI\n"));
+        await writer.write(encoder.encode("WIFI_STATUS\n"));
+        writer.releaseLock();
+      }
+
+      // Store port in ref for later use
+      serialPortRef.current = port;
+      return true;
+    } catch (err) {
+      console.error("Serial connection error:", err);
+      setError(`Failed to connect: ${err.message}`);
+      return false;
+    }
+  }, [handleArduinoData]);
+
   // Start WebSocket connection to Arduino bridge
   const startWebSocketConnection = useCallback(() => {
     try {
-      // In a real implementation, this would connect to a WebSocket server
-      // that bridges the serial connection from the Arduino
+      console.log("Attempting WebSocket connection to:", WEBSOCKET_URL);
       const socket = new WebSocket(WEBSOCKET_URL);
       
       socket.onopen = () => {
@@ -80,26 +229,43 @@ export function useArduinoData() {
       
       socket.onmessage = (event) => {
         try {
-          const message = JSON.parse(event.data);
+          console.log("WebSocket message received:", event.data);
           
-          // Handle different message types
-          if (message.type === "wifi_status") {
-            setWifiStatus({
-              connected: message.connected,
-              networks: message.networks,
-              ssid: message.ssid,
-              strength: message.strength
-            });
-          } else if (message.type === "data") {
-            const data = processArduinoData(JSON.stringify(message.data));
-            if (data) {
-              handleArduinoData(data);
+          // Try to parse as JSON first
+          try {
+            const message = JSON.parse(event.data);
+            
+            // Handle different message types
+            if (message.type === "wifi_status") {
+              setWifiStatus({
+                connected: message.connected,
+                networks: message.networks || [],
+                ssid: message.ssid,
+                strength: message.strength
+              });
+              console.log("WiFi status updated from WebSocket");
+            } else if (message.type === "data") {
+              const data = processArduinoData(JSON.stringify(message.data));
+              if (data) {
+                handleArduinoData(data);
+              }
+            } else if (message.type === "error") {
+              console.error("Arduino error:", message.message);
+              toast.error(`Arduino error: ${message.message}`);
+            } else {
+              // Process legacy format
+              const data = processArduinoData(event.data);
+              if (data) {
+                handleArduinoData(data);
+              }
             }
-          } else {
-            // Process legacy format
+          } catch (jsonErr) {
+            // Not JSON, try as raw data
             const data = processArduinoData(event.data);
             if (data) {
               handleArduinoData(data);
+            } else {
+              console.log("Unprocessable WebSocket data:", event.data);
             }
           }
         } catch (err) {
@@ -119,10 +285,11 @@ export function useArduinoData() {
       };
       
       websocketRef.current = socket;
+      return true;
     } catch (err) {
       console.error("Error starting WebSocket connection:", err);
       setError("Failed to connect to Arduino");
-      startSimulation(); // Fall back to simulation mode
+      return false;
     }
   }, [handleArduinoData]);
 
@@ -156,25 +323,68 @@ export function useArduinoData() {
   }, [handleArduinoData]);
 
   // Start listening for Arduino data
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     try {
-      // Try WebSocket connection first
-      startWebSocketConnection();
+      console.log("Starting Arduino monitoring...");
       
-      // If WebSocket fails, it will automatically fall back to simulation mode
+      // Try Serial connection first if available
+      let connected = false;
+      
+      try {
+        if ('serial' in navigator) {
+          console.log("Trying Serial API connection...");
+          connected = await startSerialConnection();
+          if (connected) {
+            console.log("Serial connection successful");
+            toast.success("Connected to Arduino via Serial");
+            return;
+          }
+        }
+      } catch (serialErr) {
+        console.error("Serial connection failed:", serialErr);
+      }
+      
+      // If Serial fails or isn't available, try WebSocket
+      if (!connected) {
+        console.log("Trying WebSocket connection...");
+        connected = startWebSocketConnection();
+        if (connected) {
+          console.log("WebSocket connection successful");
+          toast.success("Connected to Arduino via WebSocket");
+          return;
+        }
+      }
+      
+      // If both failed, start simulation mode
+      if (!connected) {
+        console.log("All connection methods failed, starting simulation");
+        toast.warning("Connection failed. Starting simulation mode.");
+        startSimulation();
+      }
     } catch (err) {
       console.error("Error starting Arduino monitoring:", err);
       setError("Failed to start monitoring");
       startSimulation(); // Fall back to simulation mode
     }
-  }, [startWebSocketConnection, startSimulation]);
+  }, [startSerialConnection, startWebSocketConnection, startSimulation]);
 
   // Stop listening for Arduino data
-  const stopListening = useCallback(() => {
+  const stopListening = useCallback(async () => {
     // Clean up WebSocket connection
     if (websocketRef.current) {
       websocketRef.current.close();
       websocketRef.current = null;
+    }
+    
+    // Clean up Serial connection if active
+    if (serialPortRef.current) {
+      try {
+        await serialPortRef.current.close();
+        console.log("Serial port closed");
+      } catch (err) {
+        console.error("Error closing serial port:", err);
+      }
+      serialPortRef.current = null;
     }
     
     // Clean up simulation interval
