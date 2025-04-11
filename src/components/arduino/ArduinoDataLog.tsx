@@ -1,55 +1,121 @@
 
+import { useState, useEffect } from "react";
 import { ArduinoData } from "@/lib/arduino-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface ArduinoDataLogProps {
   data: ArduinoData[];
 }
 
 export function ArduinoDataLog({ data }: ArduinoDataLogProps) {
+  const [showAll, setShowAll] = useState(false);
+  const [filteredData, setFilteredData] = useState<ArduinoData[]>([]);
+  const maxVisibleRows = 10;
+  
+  // Filter and sort data on each update
+  useEffect(() => {
+    // Sort data by recordedAt (newest first)
+    const sortedData = [...data].sort((a, b) => 
+      (parseInt(b.recordedAt?.toString() || '0') - parseInt(a.recordedAt?.toString() || '0'))
+    );
+    
+    setFilteredData(showAll ? sortedData : sortedData.slice(0, maxVisibleRows));
+  }, [data, showAll]);
+  
+  // Format time for better readability
+  const formatTime = (timestamp: string | number) => {
+    if (!timestamp) return "N/A";
+    
+    try {
+      // Handle different timestamp formats
+      const date = typeof timestamp === 'string' && !isNaN(Number(timestamp)) ? 
+        new Date(parseInt(timestamp)) : 
+        typeof timestamp === 'number' ? 
+          new Date(timestamp) : 
+          new Date(timestamp.toString());
+          
+      return date.toLocaleTimeString();
+    } catch (err) {
+      return timestamp.toString();
+    }
+  };
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Arduino Data Log</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Arduino Data Log</span>
+          {data.length > 0 && (
+            <Badge variant="outline">
+              {data.length} records
+            </Badge>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Machine State</TableHead>
-                <TableHead>Runtime (seconds)</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Switch State</TableHead>
+                <TableHead>Event Type</TableHead>
                 <TableHead>Recorded At</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.length === 0 ? (
+              {filteredData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center">
-                    No data received yet. Start monitoring to see data.
+                    No data received yet. Press the switch button to see data.
                   </TableCell>
                 </TableRow>
               ) : (
-                data.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.timestamp}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        item.machineState === 'True' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {item.machineState === 'True' ? 'Running' : 'Stopped'}
-                      </span>
-                    </TableCell>
-                    <TableCell>{item.runTime}</TableCell>
-                    <TableCell>{new Date(item.recordedAt).toLocaleString()}</TableCell>
-                  </TableRow>
-                ))
+                filteredData.map((item, index) => {
+                  // Determine if this is a state change from previous
+                  const isStateChange = index === filteredData.length - 1 || 
+                    item.machineState !== filteredData[index + 1].machineState;
+                  
+                  return (
+                    <TableRow key={index} className={isStateChange ? "bg-gray-50" : ""}>
+                      <TableCell>{formatTime(item.timestamp)}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          item.machineState === 'True' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.machineState === 'True' ? 'ON (Pressed)' : 'OFF (Released)'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {isStateChange ? (
+                          <Badge variant="outline" className="bg-blue-50">
+                            State Change
+                          </Badge>
+                        ) : "Update"}
+                      </TableCell>
+                      <TableCell>{new Date(item.recordedAt).toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </div>
+        
+        {data.length > maxVisibleRows && (
+          <div className="mt-4 flex justify-center">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowAll(!showAll)}
+            >
+              {showAll ? "Show Less" : `Show All (${data.length} records)`}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

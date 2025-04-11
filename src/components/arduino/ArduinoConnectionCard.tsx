@@ -107,6 +107,8 @@ export function ArduinoConnectionCard({
             <li>Connect your Arduino to your computer via USB</li>
             <li>Click "Start Monitoring" to connect to your Arduino</li>
             <li>Configure WiFi settings using the "Configure WiFi" button</li>
+            <li>Connect your button/switch to pin {2} (with pull-up resistor to ground)</li>
+            <li>Press the button to see state changes in the data logs</li>
           </ol>
           
           {!isConnected && (

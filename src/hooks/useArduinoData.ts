@@ -165,7 +165,22 @@ export function useArduinoData() {
                     });
                     console.log("WiFi status updated:", jsonData);
                   } 
-                  // Handle the new sensor reading JSON format
+                  // Handle explicit state change messages from Arduino
+                  else if (jsonData.type === "state_change") {
+                    console.log("Button state change received:", jsonData);
+                    
+                    // Create Arduino data from the state change
+                    const now = Date.now();
+                    const data: ArduinoData = {
+                      timestamp: now.toString(),
+                      machineState: jsonData.state === "on" ? "True" : "False",
+                      runTime: jsonData.timestamp ? jsonData.timestamp.toString() : "0",
+                      recordedAt: now
+                    };
+                    
+                    handleArduinoData(data);
+                  }
+                  // Handle the sensor reading JSON format
                   else if (jsonData.type === "sensor_reading") {
                     console.log("Structured sensor reading received:", jsonData);
                     
@@ -174,7 +189,7 @@ export function useArduinoData() {
                     const data: ArduinoData = {
                       timestamp: now.toString(),
                       machineState: jsonData.active ? "True" : "False",
-                      runTime: "0", // We don't have runtime info in the sensor reading
+                      runTime: jsonData.timestamp ? jsonData.timestamp.toString() : "0",
                       recordedAt: now
                     };
                     
@@ -190,8 +205,20 @@ export function useArduinoData() {
                 } catch (parseErr) {
                   console.log("Processing non-JSON data:", line);
                   
+                  // Check if it's a button state message
+                  if (line.includes("Button Pressed") || line.includes("Button Released")) {
+                    console.log("Button state change detected:", line);
+                    const isPressed = line.includes("Button Pressed");
+                    const data: ArduinoData = {
+                      timestamp: Date.now().toString(),
+                      machineState: isPressed ? "True" : "False",
+                      runTime: "0",
+                      recordedAt: Date.now()
+                    };
+                    handleArduinoData(data);
+                  }
                   // Check if it's a WiFi configuration command response
-                  if (line.startsWith("WiFi status:") || line.includes("networks found")) {
+                  else if (line.startsWith("WiFi status:") || line.includes("networks found")) {
                     console.log("WiFi info received:", line);
                   } 
                   // Check if it's a sensor value debug message

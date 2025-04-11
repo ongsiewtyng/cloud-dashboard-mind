@@ -86,28 +86,42 @@ void loop() {
             connectToWiFi();
         }
 
-        // Read sensor and update state if connected
-        if (WiFi.status() == WL_CONNECTED) {
-            // Read sensor every second
-            if (millis() - lastReadTime >= 1000) {
-                lastReadTime = millis();
-                bool currentState = readSensor();
+        // Read sensor regardless of WiFi connection - this ensures button presses are always detected
+        // We'll read more frequently (every 50ms) to ensure responsive button detection
+        if (millis() - lastReadTime >= 50) {
+            lastReadTime = millis();
+            bool currentState = readSensor();
 
-                if (currentState != machineState) {
-                    machineState = currentState;
-                    updateRunTime();
-                    logData(machineState, totalRunTime);
-                }
-
-                // Blink LED to indicate active monitoring
-                digitalWrite(ledPin, !digitalRead(ledPin));
+            if (currentState != machineState) {
+                machineState = currentState;
+                updateRunTime();
+                logData(machineState, totalRunTime);
+                
+                // Send button state change immediately over serial
+                StaticJsonDocument<128> stateChangeJson;
+                stateChangeJson["type"] = "state_change";
+                stateChangeJson["state"] = machineState ? "on" : "off";
+                stateChangeJson["timestamp"] = millis();
+                String jsonOutput;
+                serializeJson(stateChangeJson, jsonOutput);
+                Serial.println(jsonOutput);
             }
 
-            // Send data buffer if it's full or it's been more than 30 seconds
-            if (bufferIndex == BUFFER_SIZE || (millis() - lastSendTime >= 30000 && bufferIndex > 0)) {
-                sendData();
-                lastSendTime = millis();
+            // Blink LED to indicate active monitoring (faster when button is pressed)
+            if (machineState) {
+                // Fast blink when button is pressed
+                digitalWrite(ledPin, (millis() / 100) % 2);
+            } else {
+                // Slow blink when idle
+                digitalWrite(ledPin, (millis() / 500) % 2);
             }
+        }
+
+        // Send data buffer if it's full or it's been more than 10 seconds (reduced from 30)
+        if (WiFi.status() == WL_CONNECTED && 
+            (bufferIndex == BUFFER_SIZE || (millis() - lastSendTime >= 10000 && bufferIndex > 0))) {
+            sendData();
+            lastSendTime = millis();
         }
     }
 }
@@ -254,6 +268,21 @@ bool readSensor() {
         if (reading != debouncedState) {
             debouncedState = reading == LOW; // LOW means button is pressed
             Serial.println(debouncedState ? "Button Pressed (ON)" : "Button Released (OFF)");
+            
+            // Send a structured sensor reading JSON for better processing
+            StaticJsonDocument<128> sensorJson;
+            sensorJson["type"] = "sensor_reading";
+            sensorJson["value"] = debouncedState ? 1023 : 0; // Use 1023 for pressed, 0 for released
+            sensorJson["active"] = debouncedState;
+            sensorJson["timestamp"] = millis();
+            
+            String jsonString;
+            serializeJson(sensorJson, jsonString);
+            Serial.println(jsonString);
+            
+            // Also log in the old format for backward compatibility
+            Serial.print("Sensor Value: ");
+            Serial.println(debouncedState ? 1023 : 0);
         }
     }
 
